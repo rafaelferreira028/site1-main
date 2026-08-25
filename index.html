@@ -103,23 +103,23 @@
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
+            background: transparent !important;
+            border-radius: 9999px;
         }
 
         ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
-            border-radius: 4px;
+            border-radius: 9999px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
-            border-radius: 4px;
+            border-radius: 9999px;
         }
 
         /* Toast notifications */
@@ -140,7 +140,7 @@
         }
 
         /* ============================================================
-           SISTEMA DE TEMAS E ACESSIBILIDADE VISUAL (VISÃO SENSÍVEL / FOTOFOBIA)
+           SISTEMA COMPLETO DE TEMAS (MODO ESCURO E VISÃO SENSÍVEL)
            ============================================================ */
 
         /* Prevenção de flash durante o carregamento inicial */
@@ -174,7 +174,8 @@
             color: #f1f5f9 !important;
         }
 
-        body.theme-dark .text-gray-500, body.theme-dark .text-slate-500, body.theme-dark .text-gray-600 {
+        body.theme-dark .text-gray-500, body.theme-dark .text-slate-500, body.theme-dark .text-gray-600,
+        body.theme-dark .text-slate-600, body.theme-dark .text-gray-400, body.theme-dark .text-slate-400 {
             color: #94a3b8 !important;
         }
 
@@ -185,12 +186,78 @@
             color: #f1f5f9 !important;
         }
 
+        /* Sub-containers, trilhos de abas e fundos cinzas */
+        body.theme-dark .bg-slate-50,
+        body.theme-dark .bg-slate-50\/50,
+        body.theme-dark .bg-gray-50,
+        body.theme-dark .bg-gray-50\/80,
+        body.theme-dark .bg-gray-100,
+        body.theme-dark .bg-gray-100\/80,
+        body.theme-dark [class*="bg-gray-100"] {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        body.theme-dark .bg-gray-150 {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        /* Botões de Seleção / Pill Toggles no Modo Escuro Padrão */
+        body.theme-dark [id^="btn-doador-"].bg-white,
+        body.theme-dark [id^="btn-edit-doador-"].bg-white,
+        body.theme-dark .sub-tab-btn.bg-white,
+        body.theme-dark button.bg-white {
+            background-color: #334155 !important;
+            color: #f43f5e !important;
+            border-color: #475569 !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+        }
+
+        body.theme-dark [id^="btn-doador-"]:not(.bg-white),
+        body.theme-dark [id^="btn-edit-doador-"]:not(.bg-white),
+        body.theme-dark .sub-tab-btn:not(.bg-white) {
+            background-color: transparent !important;
+            color: #94a3b8 !important;
+            box-shadow: none !important;
+        }
+
+        body.theme-dark [id^="btn-doador-"]:not(.bg-white):hover,
+        body.theme-dark [id^="btn-edit-doador-"]:not(.bg-white):hover,
+        body.theme-dark .sub-tab-btn:not(.bg-white):hover {
+            color: #f8fafc !important;
+        }
+
+        /* Abas Principais de Navegação */
+        body.theme-dark .tab-btn.bg-rose-50 {
+            background-color: #334155 !important;
+            color: #f43f5e !important;
+            border-color: #475569 !important;
+        }
+
+        body.theme-dark .tab-btn:not(.bg-rose-50) {
+            color: #94a3b8 !important;
+        }
+
+        body.theme-dark .tab-btn:hover {
+            background-color: #1e293b !important;
+            color: #f8fafc !important;
+        }
+
+        /* Form Inputs, Selects e Textareas */
         body.theme-dark input,
         body.theme-dark select,
-        body.theme-dark textarea {
+        body.theme-dark textarea,
+        body.theme-dark select option {
             background-color: #0f172a !important;
             color: #f8fafc !important;
             border-color: #334155 !important;
+        }
+
+        body.theme-dark input::placeholder,
+        body.theme-dark textarea::placeholder {
+            color: #64748b !important;
         }
 
         body.theme-dark input:focus,
@@ -201,6 +268,7 @@
             box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.25) !important;
         }
 
+        /* Tabela e Células */
         body.theme-dark table {
             border-color: #334155 !important;
         }
@@ -226,6 +294,7 @@
             color: #f1f5f9 !important;
         }
 
+        /* Modais */
         body.theme-dark .modal-dialog {
             background-color: #1e293b !important;
             border-color: #334155 !important;
@@ -241,9 +310,45 @@
             border-color: #334155 !important;
         }
 
+        /* Cards Coloridos e Métricas */
+        body.theme-dark .bg-rose-50, body.theme-dark .bg-rose-50\/20 {
+            background-color: rgba(225, 29, 72, 0.15) !important;
+            border-color: rgba(225, 29, 72, 0.3) !important;
+            color: #fda4af !important;
+        }
+
+        body.theme-dark .bg-blue-50, body.theme-dark .bg-blue-50\/20 {
+            background-color: rgba(59, 130, 246, 0.15) !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
+            color: #93c5fd !important;
+        }
+
+        body.theme-dark .bg-emerald-50, body.theme-dark .bg-emerald-50\/20 {
+            background-color: rgba(16, 185, 129, 0.15) !important;
+            border-color: rgba(16, 185, 129, 0.3) !important;
+            color: #6ee7b7 !important;
+        }
+
+        body.theme-dark .bg-amber-50, body.theme-dark .bg-amber-50\/20 {
+            background-color: rgba(217, 119, 6, 0.15) !important;
+            border-color: rgba(217, 119, 6, 0.3) !important;
+            color: #fde68a !important;
+        }
+
+        body.theme-dark .bg-sky-50, body.theme-dark .bg-sky-50\/20 {
+            background-color: rgba(14, 165, 233, 0.15) !important;
+            border-color: rgba(14, 165, 233, 0.3) !important;
+            color: #7dd3fc !important;
+        }
+
+        body.theme-dark .text-rose-600 { color: #f43f5e !important; }
+        body.theme-dark .text-blue-600 { color: #60a5fa !important; }
+        body.theme-dark .text-emerald-600 { color: #34d399 !important; }
+        body.theme-dark .text-amber-600 { color: #fbbf24 !important; }
+        body.theme-dark .text-sky-600 { color: #38bdf8 !important; }
+
         /* ------------------------------------------------------------
            2. MODO VISÃO SENSÍVEL / ULTRA ESCURO ANTI-OFUSCAMENTO (.theme-ultra-dark)
-           Desenvolvido especialmente para fotofobia, astigmatismo e sensibilidade à luz.
            ------------------------------------------------------------ */
         body.theme-ultra-dark {
             background-color: #07090e !important;
@@ -262,7 +367,8 @@
             color: #e2e8f0 !important;
         }
 
-        body.theme-ultra-dark .text-gray-500, body.theme-ultra-dark .text-slate-500, body.theme-ultra-dark .text-gray-600 {
+        body.theme-ultra-dark .text-gray-500, body.theme-ultra-dark .text-slate-500, body.theme-ultra-dark .text-gray-600,
+        body.theme-ultra-dark .text-slate-600, body.theme-ultra-dark .text-gray-400, body.theme-ultra-dark .text-slate-400 {
             color: #808ea8 !important;
         }
 
@@ -274,15 +380,16 @@
             box-shadow: none !important;
         }
 
-        /* Backgrounds cinzas e neutros */
+        /* Sub-containers, trilhos de abas e fundos cinzas */
         body.theme-ultra-dark .bg-slate-50,
         body.theme-ultra-dark .bg-slate-50\/50,
         body.theme-ultra-dark .bg-gray-50,
         body.theme-ultra-dark .bg-gray-50\/80,
         body.theme-ultra-dark .bg-gray-100,
-        body.theme-ultra-dark .bg-gray-100\/80 {
+        body.theme-ultra-dark .bg-gray-100\/80,
+        body.theme-ultra-dark [class*="bg-gray-100"] {
             background-color: #141c2e !important;
-            border-color: #1a2336 !important;
+            border-color: #243047 !important;
             color: #cbd5e1 !important;
         }
 
@@ -291,7 +398,32 @@
             color: #cbd5e1 !important;
         }
 
-        /* Botões das Abas no Modo Visão Sensível */
+        /* Botões de Seleção / Pill Toggles no Modo Visão Sensível */
+        body.theme-ultra-dark [id^="btn-doador-"].bg-white,
+        body.theme-ultra-dark [id^="btn-edit-doador-"].bg-white,
+        body.theme-ultra-dark .sub-tab-btn.bg-white,
+        body.theme-ultra-dark button.bg-white {
+            background-color: #1e2a40 !important;
+            color: #f43f5e !important;
+            border-color: #2b3954 !important;
+            box-shadow: none !important;
+        }
+
+        body.theme-ultra-dark [id^="btn-doador-"]:not(.bg-white),
+        body.theme-ultra-dark [id^="btn-edit-doador-"]:not(.bg-white),
+        body.theme-ultra-dark .sub-tab-btn:not(.bg-white) {
+            background-color: transparent !important;
+            color: #808ea8 !important;
+            box-shadow: none !important;
+        }
+
+        body.theme-ultra-dark [id^="btn-doador-"]:not(.bg-white):hover,
+        body.theme-ultra-dark [id^="btn-edit-doador-"]:not(.bg-white):hover,
+        body.theme-ultra-dark .sub-tab-btn:not(.bg-white):hover {
+            color: #e2e8f0 !important;
+        }
+
+        /* Abas Principais de Navegação */
         body.theme-ultra-dark .tab-btn.bg-rose-50 {
             background-color: #1f293d !important;
             color: #f43f5e !important;
@@ -310,7 +442,8 @@
         /* Form Inputs, Selects e Textareas */
         body.theme-ultra-dark input,
         body.theme-ultra-dark select,
-        body.theme-ultra-dark textarea {
+        body.theme-ultra-dark textarea,
+        body.theme-ultra-dark select option {
             background-color: #141c2e !important;
             color: #e2e8f0 !important;
             border-color: #243047 !important;
@@ -329,54 +462,37 @@
             box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.25) !important;
         }
 
-        /* Botões brancos padrão */
-        body.theme-ultra-dark button.bg-white {
-            background-color: #1a2438 !important;
-            color: #e2e8f0 !important;
-            border-color: #283754 !important;
-        }
-
-        body.theme-ultra-dark button.bg-white:hover {
-            background-color: #22304a !important;
-        }
-
         /* Caixas de Métricas e Cards Coloridos no Modo Ultra Escuro */
-        body.theme-ultra-dark .bg-rose-50,
-        body.theme-ultra-dark .bg-rose-50\/20 {
+        body.theme-ultra-dark .bg-rose-50, body.theme-ultra-dark .bg-rose-50\/20 {
             background-color: rgba(225, 29, 72, 0.12) !important;
             border-color: rgba(225, 29, 72, 0.25) !important;
             color: #fda4af !important;
         }
 
-        body.theme-ultra-dark .bg-blue-50,
-        body.theme-ultra-dark .bg-blue-50\/20 {
+        body.theme-ultra-dark .bg-blue-50, body.theme-ultra-dark .bg-blue-50\/20 {
             background-color: rgba(59, 130, 246, 0.12) !important;
             border-color: rgba(59, 130, 246, 0.25) !important;
             color: #93c5fd !important;
         }
 
-        body.theme-ultra-dark .bg-emerald-50,
-        body.theme-ultra-dark .bg-emerald-50\/20 {
+        body.theme-ultra-dark .bg-emerald-50, body.theme-ultra-dark .bg-emerald-50\/20 {
             background-color: rgba(16, 185, 129, 0.12) !important;
             border-color: rgba(16, 185, 129, 0.25) !important;
             color: #6ee7b7 !important;
         }
 
-        body.theme-ultra-dark .bg-amber-50,
-        body.theme-ultra-dark .bg-amber-50\/20 {
+        body.theme-ultra-dark .bg-amber-50, body.theme-ultra-dark .bg-amber-50\/20 {
             background-color: rgba(217, 119, 6, 0.12) !important;
             border-color: rgba(217, 119, 6, 0.25) !important;
             color: #fde68a !important;
         }
 
-        body.theme-ultra-dark .bg-sky-50,
-        body.theme-ultra-dark .bg-sky-50\/20 {
+        body.theme-ultra-dark .bg-sky-50, body.theme-ultra-dark .bg-sky-50\/20 {
             background-color: rgba(14, 165, 233, 0.12) !important;
             border-color: rgba(14, 165, 233, 0.25) !important;
             color: #7dd3fc !important;
         }
 
-        /* Ícones dentro dos cards de estatísticas */
         body.theme-ultra-dark .text-rose-600 { color: #f43f5e !important; }
         body.theme-ultra-dark .text-blue-600 { color: #60a5fa !important; }
         body.theme-ultra-dark .text-emerald-600 { color: #34d399 !important; }
@@ -409,6 +525,18 @@
             color: #cbd5e1 !important;
         }
 
+        /* Botões de Ação na Tabela (Editar / Excluir) */
+        body.theme-dark table button.bg-blue-50,
+        body.theme-ultra-dark table button.bg-blue-50 {
+            background-color: rgba(59, 130, 246, 0.2) !important;
+            color: #60a5fa !important;
+        }
+        body.theme-dark table button.bg-rose-50,
+        body.theme-ultra-dark table button.bg-rose-50 {
+            background-color: rgba(225, 29, 72, 0.2) !important;
+            color: #f43f5e !important;
+        }
+
         /* Modais */
         body.theme-ultra-dark .modal-overlay {
             background-color: rgba(4, 6, 10, 0.85) !important;
@@ -437,14 +565,18 @@
 
         /* Dropdowns de Autocomplete */
         body.theme-ultra-dark #doador-search-results,
-        body.theme-ultra-dark #item-search-results {
+        body.theme-ultra-dark #item-search-results,
+        body.theme-dark #doador-search-results,
+        body.theme-dark #item-search-results {
             background-color: #141c2e !important;
             border-color: #243047 !important;
             color: #e2e8f0 !important;
         }
 
         body.theme-ultra-dark #doador-search-results div:hover,
-        body.theme-ultra-dark #item-search-results div:hover {
+        body.theme-ultra-dark #item-search-results div:hover,
+        body.theme-dark #doador-search-results div:hover,
+        body.theme-dark #item-search-results div:hover {
             background-color: #1e2a40 !important;
         }
 
@@ -466,17 +598,21 @@
             background-color: #1e2a40 !important;
         }
 
-        /* Custom Scrollbar no Modo Visão Sensível */
+        /* Custom Scrollbar no Modo Escuro / Visão Sensível */
+        body.theme-dark ::-webkit-scrollbar-track,
         body.theme-ultra-dark ::-webkit-scrollbar-track {
-            background: #090d16 !important;
+            background: transparent !important;
         }
 
+        body.theme-dark ::-webkit-scrollbar-thumb,
         body.theme-ultra-dark ::-webkit-scrollbar-thumb {
-            background: #1e293b !important;
+            background: #334155 !important;
+            border-radius: 9999px !important;
         }
 
+        body.theme-dark ::-webkit-scrollbar-thumb:hover,
         body.theme-ultra-dark ::-webkit-scrollbar-thumb:hover {
-            background: #334155 !important;
+            background: #475569 !important;
         }
     </style>
 </head>
@@ -988,47 +1124,51 @@
 
                 <!-- Tabela: Doadores -->
                 <div id="container-tabela-doadores"
-                    class="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <table class="w-full text-left text-sm text-gray-500">
-                        <thead
-                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                            <tr>
-                                <th class="px-6 py-3.5 font-bold">Nome</th>
-                                <th class="px-6 py-3.5 font-bold">Tipo</th>
-                                <th class="px-6 py-3.5 font-bold">CPF/CNPJ</th>
-                                <th class="px-6 py-3.5 font-bold">Cidade</th>
-                                <th class="px-6 py-3.5 font-bold">Data Nasc.</th>
-                                <th class="px-6 py-3.5 font-bold">Telefone</th>
-                                <th class="px-6 py-3.5 font-bold">E-mail</th>
-                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabela-doadores-body" class="divide-y divide-gray-200">
-                            <!-- Gerado Dinamicamente -->
-                        </tbody>
-                    </table>
+                    class="rounded-2xl border border-gray-200 shadow-sm overflow-hidden bg-white">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead
+                                class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3.5 font-bold">Nome</th>
+                                    <th class="px-6 py-3.5 font-bold">Tipo</th>
+                                    <th class="px-6 py-3.5 font-bold">CPF/CNPJ</th>
+                                    <th class="px-6 py-3.5 font-bold">Cidade</th>
+                                    <th class="px-6 py-3.5 font-bold">Data Nasc.</th>
+                                    <th class="px-6 py-3.5 font-bold">Telefone</th>
+                                    <th class="px-6 py-3.5 font-bold">E-mail</th>
+                                    <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-doadores-body" class="divide-y divide-gray-200">
+                                <!-- Gerado Dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Tabela: Doações -->
                 <div id="container-tabela-doacoes"
-                    class="hidden overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <table class="w-full text-left text-sm text-gray-500">
-                        <thead
-                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                            <tr>
-                                <th class="px-6 py-3.5 font-bold">Doador</th>
-                                <th class="px-6 py-3.5 font-bold">Canal</th>
-                                <th class="px-6 py-3.5 font-bold">Tipo</th>
-                                <th class="px-6 py-3.5 font-bold">Detalhes</th>
-                                <th class="px-6 py-3.5 font-bold">Obs.</th>
-                                <th class="px-6 py-3.5 font-bold">Data</th>
-                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabela-doacoes-body" class="divide-y divide-gray-200">
-                            <!-- Gerado Dinamicamente -->
-                        </tbody>
-                    </table>
+                    class="hidden rounded-2xl border border-gray-200 shadow-sm overflow-hidden bg-white">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead
+                                class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3.5 font-bold">Doador</th>
+                                    <th class="px-6 py-3.5 font-bold">Canal</th>
+                                    <th class="px-6 py-3.5 font-bold">Tipo</th>
+                                    <th class="px-6 py-3.5 font-bold">Detalhes</th>
+                                    <th class="px-6 py-3.5 font-bold">Obs.</th>
+                                    <th class="px-6 py-3.5 font-bold">Data</th>
+                                    <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-doacoes-body" class="divide-y divide-gray-200">
+                                <!-- Gerado Dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -1172,45 +1312,49 @@
 
                 <!-- Tabela: Visualização por Canais (Doações) -->
                 <div id="container-estoque-canais"
-                    class="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <table class="w-full text-left text-sm text-gray-500">
-                        <thead
-                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                            <tr>
-                                <th class="px-6 py-3.5 font-bold">Data</th>
-                                <th class="px-6 py-3.5 font-bold">Tipo</th>
-                                <th class="px-6 py-3.5 font-bold">Descrição / Detalhes</th>
-                                <th class="px-6 py-3.5 font-bold">Estado / Destino</th>
-                                <th class="px-6 py-3.5 font-bold">Obs.</th>
-                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabela-estoque-canais-body" class="divide-y divide-gray-200">
-                            <!-- Gerado Dinamicamente -->
-                        </tbody>
-                    </table>
+                    class="rounded-2xl border border-gray-200 shadow-sm overflow-hidden bg-white">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead
+                                class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3.5 font-bold">Data</th>
+                                    <th class="px-6 py-3.5 font-bold">Tipo</th>
+                                    <th class="px-6 py-3.5 font-bold">Descrição / Detalhes</th>
+                                    <th class="px-6 py-3.5 font-bold">Estado / Destino</th>
+                                    <th class="px-6 py-3.5 font-bold">Obs.</th>
+                                    <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-estoque-canais-body" class="divide-y divide-gray-200">
+                                <!-- Gerado Dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Tabela: Visualização por Categorias (Itens Físicos) -->
                 <div id="container-estoque-materiais"
-                    class="hidden overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <table class="w-full text-left text-sm text-gray-500">
-                        <thead id="tabela-estoque-materiais-head"
-                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                            <tr>
-                                <th class="px-6 py-3.5 font-bold">Descrição do Item</th>
-                                <th class="px-6 py-3.5 font-bold text-center">Quantidade Acumulada</th>
-                                <th class="px-6 py-3.5 font-bold">Unidade</th>
-                                <th class="px-6 py-3.5 font-bold">Estado de Conservação</th>
-                                <th class="px-6 py-3.5 font-bold">Destino Atual</th>
-                                <th class="px-6 py-3.5 font-bold">Entradas / Lotes</th>
-                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabela-estoque-materiais-body" class="divide-y divide-gray-200">
-                            <!-- Gerado Dinamicamente -->
-                        </tbody>
-                    </table>
+                    class="hidden rounded-2xl border border-gray-200 shadow-sm overflow-hidden bg-white">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead id="tabela-estoque-materiais-head"
+                                class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3.5 font-bold">Descrição do Item</th>
+                                    <th class="px-6 py-3.5 font-bold text-center">Quantidade Acumulada</th>
+                                    <th class="px-6 py-3.5 font-bold">Unidade</th>
+                                    <th class="px-6 py-3.5 font-bold">Estado de Conservação</th>
+                                    <th class="px-6 py-3.5 font-bold">Destino Atual</th>
+                                    <th class="px-6 py-3.5 font-bold">Entradas / Lotes</th>
+                                    <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-estoque-materiais-body" class="divide-y divide-gray-200">
+                                <!-- Gerado Dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
