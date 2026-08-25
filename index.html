@@ -797,6 +797,8 @@
                 </div>
                 <form id="form-editar-estoque" class="p-6 space-y-4">
                     <input type="hidden" id="edit-stock-id">
+                    <input type="hidden" id="edit-stock-modo" value="lote">
+                    <input type="hidden" id="edit-stock-grupo-key">
 
                     <div>
                         <label class="block text-sm font-semibold mb-1 text-gray-600">Descrição do Item *</label>
@@ -2780,6 +2782,7 @@
 
                 // Agrupar itens por descrição normalizada e unidade
                 const grupos = {};
+                window.gruposConsolidadosMap = {};
                 lista.forEach(item => {
                     const key = item.descricao_item.trim().toLowerCase() + '_' + item.unidade_medida;
                     if (!grupos[key]) {
@@ -2795,7 +2798,9 @@
                     grupos[key].lotes.push(item);
                 });
 
-                Object.values(grupos).forEach(grupo => {
+                Object.values(grupos).forEach((grupo, idx) => {
+                    const grupoKey = 'grupo_' + idx;
+                    window.gruposConsolidadosMap[grupoKey] = grupo;
                     const primeiroItem = grupo.lotes[0];
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-rose-50/40 border-b border-gray-200 transition duration-150";
@@ -2817,7 +2822,7 @@
                             ${grupo.lotes.length} lote(s) doado(s)
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <button onclick="abrirEditarEstoque(${primeiroItem.id_material})" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition inline-flex items-center justify-center w-8 h-8" title="Editar Item no Estoque">
+                            <button onclick="abrirEditarEstoqueConsolidado('${grupoKey}')" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition inline-flex items-center justify-center w-8 h-8" title="Editar Item Consolidado no Estoque">
                                 <i data-lucide="pencil" class="w-4 h-4"></i>
                             </button>
                         </td>
@@ -2873,11 +2878,36 @@
             renderizarAbaEstoqueAtual();
         }
 
+        function abrirEditarEstoqueConsolidado(grupoKey) {
+            const grupo = window.gruposConsolidadosMap ? window.gruposConsolidadosMap[grupoKey] : null;
+            if (!grupo || !grupo.lotes || grupo.lotes.length === 0) return;
+
+            const primeiroItem = grupo.lotes[0];
+
+            const selectCat = document.getElementById('edit-stock-categoria');
+            const originalCatSelect = document.getElementById('mat-categoria');
+            if (selectCat && originalCatSelect) {
+                selectCat.innerHTML = originalCatSelect.innerHTML;
+            }
+
+            document.getElementById('edit-stock-id').value = primeiroItem.id_material;
+            document.getElementById('edit-stock-modo').value = 'consolidado';
+            document.getElementById('edit-stock-grupo-key').value = grupoKey;
+
+            document.getElementById('edit-stock-descricao').value = grupo.descricao;
+            if (selectCat) selectCat.value = primeiroItem.id_categoria;
+            document.getElementById('edit-stock-qtd').value = grupo.quantidadeTotal;
+            document.getElementById('edit-stock-unidade').value = grupo.unidade;
+            document.getElementById('edit-stock-estado').value = primeiroItem.estado_conservacao || 'Novo';
+            document.getElementById('edit-stock-destino').value = grupo.destino;
+
+            mostrarModal('modal-editar-estoque');
+        }
+
         function abrirEditarEstoque(idMaterial) {
             const item = estoqueList.find(i => i.id_material === idMaterial);
             if (!item) return;
 
-            // Preencher select de categorias
             const selectCat = document.getElementById('edit-stock-categoria');
             const originalCatSelect = document.getElementById('mat-categoria');
             if (selectCat && originalCatSelect) {
@@ -2885,6 +2915,9 @@
             }
 
             document.getElementById('edit-stock-id').value = item.id_material;
+            document.getElementById('edit-stock-modo').value = 'lote';
+            document.getElementById('edit-stock-grupo-key').value = '';
+
             document.getElementById('edit-stock-descricao').value = item.descricao_item;
             if (selectCat) selectCat.value = item.id_categoria;
             document.getElementById('edit-stock-qtd').value = item.quantidade;
@@ -2904,31 +2937,78 @@
             e.preventDefault();
             exibirCarregamentoGlobal();
             const idMaterial = parseInt(document.getElementById('edit-stock-id').value);
+            const modo = document.getElementById('edit-stock-modo').value;
+            const grupoKey = document.getElementById('edit-stock-grupo-key').value;
 
-            const itemAtualizado = {
-                descricao_item: document.getElementById('edit-stock-descricao').value,
-                id_categoria: parseInt(document.getElementById('edit-stock-categoria').value),
-                quantidade: parseInt(document.getElementById('edit-stock-qtd').value),
-                unidade_medida: document.getElementById('edit-stock-unidade').value,
-                estado_conservacao: document.getElementById('edit-stock-estado').value,
-                destino_item: document.getElementById('edit-stock-destino').value
-            };
+            const novaDesc = document.getElementById('edit-stock-descricao').value;
+            const novaCat = parseInt(document.getElementById('edit-stock-categoria').value);
+            const novaQtd = parseInt(document.getElementById('edit-stock-qtd').value);
+            const novaUnidade = document.getElementById('edit-stock-unidade').value;
+            const novoEstado = document.getElementById('edit-stock-estado').value;
+            const novoDestino = document.getElementById('edit-stock-destino').value;
 
-            const { error } = await supabaseClient
-                .from('doacoes_materiais')
-                .update(itemAtualizado)
-                .eq('id_material', idMaterial);
+            if (modo === 'consolidado' && window.gruposConsolidadosMap && window.gruposConsolidadosMap[grupoKey]) {
+                const grupo = window.gruposConsolidadosMap[grupoKey];
+                const diferenca = novaQtd - grupo.quantidadeTotal;
 
-            ocultarCarregamentoGlobal();
+                const updatePromises = grupo.lotes.map((lote, index) => {
+                    let qtdLote = lote.quantidade;
+                    if (index === 0) {
+                        qtdLote = Math.max(0, lote.quantidade + diferenca);
+                    }
+                    return supabaseClient
+                        .from('doacoes_materiais')
+                        .update({
+                            descricao_item: novaDesc,
+                            id_categoria: novaCat,
+                            quantidade: qtdLote,
+                            unidade_medida: novaUnidade,
+                            estado_conservacao: novoEstado,
+                            destino_item: novoDestino
+                        })
+                        .eq('id_material', lote.id_material);
+                });
 
-            if (error) {
-                mostrarToast('Erro ao atualizar item do estoque: ' + error.message, 'error');
+                const results = await Promise.all(updatePromises);
+                const hasError = results.some(r => r.error);
+
+                ocultarCarregamentoGlobal();
+
+                if (hasError) {
+                    mostrarToast('Erro ao atualizar alguns lotes do estoque.', 'error');
+                } else {
+                    mostrarToast('Estoque acumulado atualizado com sucesso!', 'success');
+                    fecharModalEditarEstoque();
+                    carregarEstoque();
+                    carregarMetricas();
+                    listarDoacoesAdmin();
+                }
             } else {
-                mostrarToast('Item de estoque atualizado com sucesso!', 'success');
-                fecharModalEditarEstoque();
-                carregarEstoque();
-                carregarMetricas();
-                listarDoacoesAdmin();
+                const itemAtualizado = {
+                    descricao_item: novaDesc,
+                    id_categoria: novaCat,
+                    quantidade: novaQtd,
+                    unidade_medida: novaUnidade,
+                    estado_conservacao: novoEstado,
+                    destino_item: novoDestino
+                };
+
+                const { error } = await supabaseClient
+                    .from('doacoes_materiais')
+                    .update(itemAtualizado)
+                    .eq('id_material', idMaterial);
+
+                ocultarCarregamentoGlobal();
+
+                if (error) {
+                    mostrarToast('Erro ao atualizar item do estoque: ' + error.message, 'error');
+                } else {
+                    mostrarToast('Item de estoque atualizado com sucesso!', 'success');
+                    fecharModalEditarEstoque();
+                    carregarEstoque();
+                    carregarMetricas();
+                    listarDoacoesAdmin();
+                }
             }
         });
     </script>
