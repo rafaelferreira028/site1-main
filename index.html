@@ -284,7 +284,8 @@
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1 text-gray-600">Data de Nascimento</label>
-                            <input type="date" id="doador-data-nascimento"
+                            <input type="date" id="doador-data-nascimento" max="9999-12-31" min="1900-01-01"
+                                oninput="limitarAnoDataInput(this)"
                                 class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
                         </div>
                     </div>
@@ -931,7 +932,8 @@
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1 text-gray-600">Data de Nascimento</label>
-                            <input type="date" id="edit-doador-data-nascimento"
+                            <input type="date" id="edit-doador-data-nascimento" max="9999-12-31" min="1900-01-01"
+                                oninput="limitarAnoDataInput(this)"
                                 class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
                         </div>
                     </div>
@@ -1914,11 +1916,23 @@
             }
         }
 
+        function limitarAnoDataInput(input) {
+            if (!input || !input.value) return;
+            const partes = input.value.split('-');
+            if (partes[0] && partes[0].length > 4) {
+                partes[0] = partes[0].slice(0, 4);
+                input.value = partes.join('-');
+            }
+        }
+
         function formatarDataBR(dataIso) {
             if (!dataIso) return '-';
             const partes = dataIso.split('-');
             if (partes.length === 3) {
-                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+                const ano = partes[0].slice(0, 4);
+                const mes = partes[1].padStart(2, '0');
+                const dia = partes[2].padStart(2, '0');
+                return `${dia}/${mes}/${ano}`;
             }
             return dataIso;
         }
