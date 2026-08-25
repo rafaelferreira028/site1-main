@@ -1230,13 +1230,17 @@
 
                 <!-- Navegação Interna de Estoque (Canais e Categorias Dedicadas) -->
                 <div class="space-y-4 mb-6 border-b border-gray-200 pb-6">
-                    <!-- Seção 1: Categorias Dedicadas e Itens Físicos (Destaque Principal ao Bazar) -->
+                    <!-- Seção 1: Categorias Dedicadas e Itens Físicos (Estoque Geral + Subcategorias) -->
                     <div>
                         <span class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Inventário de Conteúdo e Itens Doados</span>
                         <div class="flex flex-wrap gap-2">
-                            <button onclick="switchEstoqueSubTab('Bazar')" id="btn-est-Bazar"
+                            <button onclick="switchEstoqueSubTab('Geral')" id="btn-est-Geral"
                                 class="estoque-sub-btn px-4 py-2.5 text-xs font-bold rounded-xl bg-rose-600 text-white border border-rose-600 shadow-sm focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-2">
-                                <i data-lucide="shopping-bag" class="w-4 h-4"></i> 🛍️ Local Dedicado ao Bazar
+                                <i data-lucide="layers" class="w-4 h-4"></i> 📦 Estoque Geral (Todos os Itens)
+                            </button>
+                            <button onclick="switchEstoqueSubTab('Bazar')" id="btn-est-Bazar"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="shopping-bag" class="w-3.5 h-3.5"></i> 🛍️ Bazar
                             </button>
                             <button onclick="switchEstoqueSubTab('Alimentos')" id="btn-est-Alimentos"
                                 class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
@@ -3123,7 +3127,7 @@
 
         let estoqueList = [];
         let estoqueDoacoesList = [];
-        let estoqueSubTabAtiva = 'Bazar'; // Default active sub-tab (Destaque para Bazar)
+        let estoqueSubTabAtiva = 'Geral'; // Padrão principal: Estoque Geral (Todos os Itens)
         let modoVisaoEstoque = 'consolidado'; // 'consolidado' ou 'lotes'
 
         function alterarModoVisaoEstoque(modo) {
@@ -3159,7 +3163,7 @@
             const activeBtn = document.getElementById('btn-est-' + tabName);
             if (activeBtn) {
                 activeBtn.classList.remove('bg-white', 'text-gray-600', 'border-gray-200', 'hover:bg-gray-50');
-                if (tabName === 'Bazar') {
+                if (tabName === 'Geral' || tabName === 'Bazar') {
                     activeBtn.classList.add('bg-rose-600', 'text-white', 'border-rose-600', 'shadow-sm', 'font-bold');
                 } else {
                     const canais = ['Presencial', 'PIX', 'Dinheiro'];
@@ -3183,6 +3187,12 @@
                 const iconContainer = document.getElementById('banner-icon-container');
 
                 const descricoesBanners = {
+                    'Geral': {
+                        titulo: 'Inventário do Estoque Geral (Todos os Itens e Lotes)',
+                        sub: 'Exibição completa e unificada de todos os materiais, cestas, insumos e produtos doados em estoque.',
+                        icon: 'layers',
+                        color: 'bg-rose-100 text-rose-700'
+                    },
                     'Bazar': {
                         titulo: 'Resumo Consolidado do Estoque: Bazar',
                         sub: 'Exibição exclusiva e quantitativo acumulado de todos os itens doados para o Bazar.',
@@ -3215,7 +3225,7 @@
                     }
                 };
 
-                const info = descricoesBanners[tabName] || descricoesBanners['Bazar'];
+                const info = descricoesBanners[tabName] || descricoesBanners['Geral'];
                 if (tituloBanner) tituloBanner.innerText = info.titulo;
                 if (subTituloBanner) subTituloBanner.innerText = info.sub;
                 if (iconContainer) {
@@ -3338,9 +3348,12 @@
                 document.getElementById('container-estoque-materiais')?.classList.remove('hidden');
 
                 let filtered = [];
-                if (estoqueSubTabAtiva === 'Bazar') {
-                    // Dedicated Bazar filter: destino === 'Bazar' OU categoria 6 (Vestuário/Bazar)
-                    filtered = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6);
+                if (estoqueSubTabAtiva === 'Geral') {
+                    // Visão completa do Estoque Geral (Exibe todos os itens doados)
+                    filtered = estoqueList;
+                } else if (estoqueSubTabAtiva === 'Bazar') {
+                    // Filtro dedicado ao Bazar: destino === 'Bazar' OU categoria 6 (Vestuário/Bazar)
+                    filtered = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6 || (m.categorias_itens && m.categorias_itens.nome_categoria.toLowerCase().includes('bazar')));
                 } else {
                     const mapCat = {
                         'Alimentos': 2,
@@ -3349,7 +3362,7 @@
                         'Ortopedicos': 5
                     };
                     const catId = mapCat[estoqueSubTabAtiva];
-                    filtered = estoqueList.filter(m => m.id_categoria === catId);
+                    filtered = estoqueList.filter(m => m.id_categoria === catId || (m.categorias_itens && m.categorias_itens.nome_categoria.toLowerCase().includes(estoqueSubTabAtiva.toLowerCase())));
                 }
 
                 // Apply search filter if query is present
@@ -3503,11 +3516,12 @@
                 });
 
             } else {
-                // Atualizar cabeçalho para visão de lotes individuais
+                // Atualizar cabeçalho para visão de lotes individuais (incluindo Categoria)
                 if (thead) {
                     thead.innerHTML = `
                         <tr>
                             <th class="px-6 py-3.5 font-bold">Descrição do Item</th>
+                            <th class="px-6 py-3.5 font-bold">Categoria</th>
                             <th class="px-6 py-3.5 font-bold text-center">Quantidade</th>
                             <th class="px-6 py-3.5 font-bold">Unidade</th>
                             <th class="px-6 py-3.5 font-bold">Estado de Conservação</th>
@@ -3523,10 +3537,13 @@
                         ? new Date(item.doacoes.data_doacao).toLocaleDateString('pt-BR')
                         : '-';
 
+                    const catNome = item.categorias_itens ? item.categorias_itens.nome_categoria : 'Estoque Geral';
+
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-gray-50 border-b border-gray-200 transition duration-150";
                     tr.innerHTML = `
                         <td class="px-6 py-4 font-medium text-gray-900 text-xs">${item.descricao_item}</td>
+                        <td class="px-6 py-4 text-xs font-semibold text-rose-600">${catNome}</td>
                         <td class="px-6 py-4 text-center font-bold text-gray-900 text-xs">${item.quantidade}</td>
                         <td class="px-6 py-4 text-xs">${item.unidade_medida}</td>
                         <td class="px-6 py-4 text-xs">${item.estado_conservacao}</td>
