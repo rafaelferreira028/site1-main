@@ -1,0 +1,2923 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rede de Combate ao Câncer - Sistema de Doações</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        /* Transições de abas */
+        .tab-content {
+            display: none;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-content.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Efeitos Hover e Brilhos */
+        .hover-scale {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .hover-scale:hover {
+            box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+        }
+
+        /* Modais */
+        .modal-overlay {
+            opacity: 0;
+            transition: opacity 0.2s ease-out;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+        }
+
+        .modal-dialog {
+            transform: scale(0.98) translateY(8px);
+            opacity: 0;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+        }
+
+        .modal-dialog.show {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        /* Inputs e Selects Focus Rings */
+        input,
+        select,
+        textarea {
+            transition: all 0.15s ease-in-out;
+        }
+
+        input:not(#global-password-input):focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #e11d48 !important;
+            /* rose-600 */
+            box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.1) !important;
+            background-color: #ffffff !important;
+        }
+
+        /* Barra de Progresso do Topo */
+        #global-progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            background: #e11d48;
+            z-index: 9999;
+            transition: width 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+
+        /* Toast notifications */
+        .toast-item {
+            animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes toast-slide-in {
+            from {
+                transform: translateY(12px) scale(0.95);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50/50 text-slate-800 font-sans antialiased min-h-screen">
+
+    <!-- CONTAINER DE TOASTS -->
+    <div id="toast-container"
+        class="fixed bottom-5 right-5 z-[10000] flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- BARRA DE CARREGAMENTO GLOBAL -->
+    <div id="global-progress-bar"></div>
+
+    <!-- TELA DE LOGIN GLOBAL -->
+    <!-- TELA DE LOGIN GLOBAL -->
+    <div id="global-login-container" class="min-h-screen flex items-center justify-center bg-slate-50 px-4 relative">
+        <div
+            class="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-sm max-w-sm w-full text-center space-y-6 relative z-10 transition-all duration-200">
+            <div
+                class="mx-auto w-12 h-12 bg-rose-50 border border-rose-100/60 rounded-full flex items-center justify-center">
+                <i data-lucide="shield-alert" class="w-5 h-5 text-rose-600"></i>
+            </div>
+            <div class="space-y-1">
+                <h2 class="text-lg font-bold text-slate-800 tracking-tight">Acesso Restrito ao Sistema</h2>
+                <p class="text-xs text-slate-500">Insira o e-mail e a senha de acesso para utilizar o sistema de
+                    doações.</p>
+            </div>
+            <form id="form-global-login" onsubmit="loginGlobal(event)" class="space-y-4">
+                <div class="relative flex items-center">
+                    <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+                    <input type="email" id="global-email-input" placeholder="E-mail de Acesso" required
+                        class="w-full border border-slate-300 bg-white pl-10 pr-4 py-2.5 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition font-medium">
+                </div>
+                <div class="relative flex items-center">
+                    <i data-lucide="key-round" class="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none"></i>
+                    <input type="password" id="global-password-input" placeholder="Senha de Acesso" required
+                        class="w-full border border-slate-300 bg-white pl-10 pr-4 py-2.5 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition font-medium">
+                </div>
+                <p id="global-login-error-msg"
+                    class="hidden text-xs text-rose-600 font-semibold flex items-center justify-center gap-1">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i> Credenciais inválidas. Tente
+                    novamente.
+                </p>
+                <button type="submit"
+                    class="w-full bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-6 rounded-xl transition cursor-pointer text-sm shadow-sm">
+                    Entrar no Sistema
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO DO APLICATIVO -->
+    <div id="app-container" class="hidden">
+
+        <header class="bg-white py-5 px-8 border-b border-gray-100">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">Rede Feminina de Combate ao Câncer</h1>
+                    <p class="text-xs text-slate-500">Sistema Integrado de Gestão de Doações</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span
+                        class="bg-rose-50 border border-rose-100 px-3 py-1 rounded-full text-xs font-semibold text-rose-700">Painel
+                        Administrativo</span>
+                    <button id="btn-global-logout" onclick="logoutGlobal()"
+                        class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-medium transition cursor-pointer flex items-center gap-1.5 shadow-sm">
+                        <i data-lucide="log-out" class="w-3.5 h-3.5 text-slate-500"></i> Sair
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <nav class="bg-white border-b border-gray-200 px-8 py-3.5">
+            <div class="max-w-6xl mx-auto flex flex-wrap gap-2">
+                <button onclick="switchTab('doador')" id="btn-doador"
+                    class="tab-btn px-5 py-2.5 text-sm font-medium rounded-xl transition duration-150 focus:outline-none bg-rose-50 text-rose-600 shadow-sm border border-rose-100 flex items-center gap-2">
+                    <i data-lucide="user-plus" class="w-4 h-4"></i> 1. Cadastrar Doador
+                </button>
+                <button onclick="switchTab('doacao_mista')" id="btn-doacao_mista"
+                    class="tab-btn px-5 py-2.5 text-sm font-medium rounded-xl transition duration-150 focus:outline-none text-gray-500 hover:text-gray-900 hover:bg-gray-50 flex items-center gap-2 border border-transparent">
+                    <i data-lucide="gift" class="w-4 h-4"></i> 2. Registrar Doação
+                </button>
+                <button onclick="switchTab('admin')" id="btn-admin"
+                    class="tab-btn px-5 py-2.5 text-sm font-medium rounded-xl transition duration-150 focus:outline-none text-gray-500 hover:text-gray-900 hover:bg-gray-50 flex items-center gap-2 border border-transparent">
+                    <i data-lucide="settings" class="w-4 h-4"></i> 3. Painel Administrativo
+                </button>
+                <button onclick="switchTab('estoque')" id="btn-estoque"
+                    class="tab-btn px-5 py-2.5 text-sm font-medium rounded-xl transition duration-150 focus:outline-none text-gray-500 hover:text-gray-900 hover:bg-gray-50 flex items-center gap-2 border border-transparent">
+                    <i data-lucide="package" class="w-4 h-4"></i> 4. Controle de Estoque
+                </button>
+            </div>
+        </nav>
+
+        <main class="max-w-6xl mx-auto p-8">
+
+            <div id="tab-doador"
+                class="tab-content active visible bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h2 class="text-xl font-bold mb-6 text-gray-700 flex items-center gap-2">
+                    <i data-lucide="user-plus" class="w-5 h-5 text-rose-600"></i> Novo Cadastro de Doador
+                </h2>
+                <form id="form-doador" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Nome / Razão Social *</label>
+                            <input type="text" id="doador-nome" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none"
+                                placeholder="Nome completo ou empresa">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Tipo de Doador *</label>
+                            <div
+                                class="flex bg-gray-100 p-1 rounded-xl border border-gray-200/50 h-[48px] items-center">
+                                <button type="button" id="btn-doador-pf" onclick="selecionarTipoDoador('PF')"
+                                    class="flex-1 h-full text-sm font-semibold rounded-lg bg-white shadow-sm text-rose-600 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5">
+                                    <i data-lucide="user" class="w-4 h-4"></i> Pessoa Física (CPF)
+                                </button>
+                                <button type="button" id="btn-doador-pj" onclick="selecionarTipoDoador('PJ')"
+                                    class="flex-1 h-full text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-800 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5">
+                                    <i data-lucide="building-2" class="w-4 h-4"></i> Pessoa Jurídica (CNPJ)
+                                </button>
+                            </div>
+                            <input type="hidden" id="doador-tipo" value="PF">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label id="label-doador-documento"
+                                class="block text-sm font-semibold mb-1 text-gray-600">CPF *</label>
+                            <input type="text" id="doador-documento"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none"
+                                placeholder="Apenas números">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Telefone</label>
+                            <input type="tel" id="doador-telefone"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none"
+                                placeholder="(00) 00000-0000">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">E-mail</label>
+                            <input type="email" id="doador-email"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none"
+                                placeholder="exemplo@email.com">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Cidade</label>
+                            <input type="text" id="doador-cidade"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none"
+                                placeholder="Ex: Catanduva - SP">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Data de Nascimento</label>
+                            <input type="date" id="doador-data-nascimento"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end">
+                        <button type="submit"
+                            class="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-6 rounded-xl cursor-pointer hover-scale shadow-sm">Salvar
+                            Doador</button>
+                    </div>
+                </form>
+            </div>
+
+
+            <div id="tab-doacao_mista" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h2 class="text-xl font-bold mb-6 text-gray-700 flex items-center gap-2">
+                    <i data-lucide="gift" class="w-5 h-5 text-rose-600"></i> Registrar Nova Doação
+                </h2>
+                <form id="form-doacao" class="space-y-6">
+
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-gray-200/60">
+                        <div class="relative" id="container-search-doador-form">
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Doador Vinculado *</label>
+                            <div class="relative">
+                                <input type="text" id="doador-search-input" autocomplete="off"
+                                    placeholder="🔍 Pesquisar por nome, CPF/CNPJ..."
+                                    oninput="filtrarDoadoresInput('form', this.value)"
+                                    onfocus="abrirDropdownDoadores('form')"
+                                    class="w-full border border-gray-300 p-2.5 pr-9 rounded-xl bg-white outline-none text-slate-800 text-sm font-medium transition focus:border-rose-600">
+                                <button type="button" id="btn-clear-doador-form" onclick="limparSelecaoDoador('form')"
+                                    class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 p-1 cursor-pointer rounded-lg hover:bg-gray-100 transition">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <select id="doacao-id-doador" required class="sr-only opacity-0 h-0 w-0 absolute pointer-events-none">
+                                <option value="">Selecione um doador</option>
+                            </select>
+                            <div id="dropdown-doadores-form"
+                                class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-gray-100 transition-all">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Canal de Recebimento *</label>
+                            <select id="doacao-canal" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                <option value="Presencial">Presencial</option>
+                                <option value="PIX">PIX</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Observações Gerais</label>
+                            <input type="text" id="doacao-observacoes"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none"
+                                placeholder="Ex: Doação em memória de... / Campanha de agasalho">
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <div class="space-y-4">
+                        <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Conteúdo da Doação</h3>
+
+                        <div class="flex flex-wrap gap-4">
+                            <label
+                                class="inline-flex items-center cursor-pointer bg-slate-50/50 p-3 rounded-xl border border-gray-200 hover:bg-slate-100 transition">
+                                <input type="checkbox" id="check-financeiro" class="accent-rose-600 mr-2"
+                                    onchange="toggleSubForm('sub-financeiro', this)">
+                                <span class="text-sm font-medium text-gray-700">Possui Valor Financeiro
+                                    (Dinheiro/PIX)</span>
+                            </label>
+                            <label
+                                class="inline-flex items-center cursor-pointer bg-slate-50/50 p-3 rounded-xl border border-gray-200 hover:bg-slate-100 transition">
+                                <input type="checkbox" id="check-material" class="accent-rose-600 mr-2"
+                                    onchange="toggleSubForm('sub-material', this)">
+                                <span class="text-sm font-medium text-gray-700">Possui Itens Físicos (Materiais)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="sub-financeiro"
+                        class="hidden p-5 border-l-4 border-emerald-500 bg-emerald-50/20 rounded-r-2xl space-y-4 border-t border-b border-r border-emerald-100/50">
+                        <h4 class="font-bold text-emerald-800 text-sm">Dados Financeiros</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Valor (R$)</label>
+                                <input type="number" id="fin-valor" step="0.01"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none"
+                                    placeholder="0,00">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Comprovante / ID
+                                    Transação</label>
+                                <input type="text" id="fin-comprovante"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none"
+                                    placeholder="Código identificador se houver">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sub-material"
+                        class="hidden p-5 border-l-4 border-blue-500 bg-blue-50/20 rounded-r-2xl space-y-4 border-t border-b border-r border-blue-100/50">
+                        <h4 class="font-bold text-blue-800 text-sm flex items-center justify-between">
+                            <span>Dados do Material/Item Físico</span>
+                            <span class="text-xs font-normal text-blue-600">Selecione o conteúdo doado abaixo para preenchimento automático</span>
+                        </h4>
+
+                        <!-- SELEÇÃO RÁPIDA DE CONTEÚDO -->
+                        <div class="bg-white p-3.5 rounded-xl border border-blue-200/80 shadow-xs">
+                            <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-slate-700">Qual o conteúdo da doação física?</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                <button type="button" onclick="selecionarPresetConteudo('bazar', 'form')" id="preset-form-bazar"
+                                    class="preset-btn-form p-2.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="shopping-bag" class="w-5 h-5 text-rose-600"></i>
+                                    <span>🛍️ Bazar / Vestuário</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('alimentos', 'form')" id="preset-form-alimentos"
+                                    class="preset-btn-form p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="apple" class="w-5 h-5 text-amber-600"></i>
+                                    <span>🍞 Alimentos</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('higiene', 'form')" id="preset-form-higiene"
+                                    class="preset-btn-form p-2.5 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-sky-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="droplet" class="w-5 h-5 text-sky-600"></i>
+                                    <span>🧴 Higiene</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('cabelo', 'form')" id="preset-form-cabelo"
+                                    class="preset-btn-form p-2.5 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100 text-purple-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="sparkles" class="w-5 h-5 text-purple-600"></i>
+                                    <span>💇 Cabelo / Perucas</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('ortopedicos', 'form')" id="preset-form-ortopedicos"
+                                    class="preset-btn-form p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="accessibility" class="w-5 h-5 text-emerald-600"></i>
+                                    <span>♿ Ortopédicos</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Descrição do Item *</label>
+                                <input type="text" id="mat-descricao"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none"
+                                    placeholder="Ex: Roupas para Bazar, 5 Cestas Básicas">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Categoria *</label>
+                                <select id="mat-categoria"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <option value="">Carregando categorias...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Quantidade Doada *</label>
+                                <input type="number" id="mat-qtd" min="1" value="1"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none font-bold text-slate-800">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Unidade de Medida</label>
+                                <select id="mat-unidade"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <option value="Unidade">Unidade</option>
+                                    <option value="Pacote">Pacote</option>
+                                    <option value="Kg">Kg</option>
+                                    <option value="Cm">Cm</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Estado de Conservação</label>
+                                <select id="mat-estado"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <option value="Não se aplica">Não se aplica</option>
+                                    <option value="Novo">Novo</option>
+                                    <option value="Seminovo">Seminovo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Destino Inicial *</label>
+                                <select id="mat-destino"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <option value="Estoque Geral">Estoque Geral</option>
+                                    <option value="Uso Direto Paciente">Uso Direto Paciente</option>
+                                    <option value="Bazar">Bazar</option>
+                                    <option value="Consumo Interno">Consumo Interno</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end">
+                        <button type="submit"
+                            class="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-6 rounded-xl cursor-pointer hover-scale shadow-sm">Gravar
+                            Doação no Banco</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB PAINEL ADMINISTRATIVO -->
+            <div id="tab-admin" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h2 class="text-xl font-bold mb-6 text-gray-700 flex items-center gap-2">
+                    <i data-lucide="settings" class="w-5 h-5 text-rose-600"></i> Painel Administrativo de Gestão
+                </h2>
+
+                <!-- Cards de Métricas (WOW Factor) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-gray-200 flex items-center gap-4 shadow-sm hover-scale cursor-default">
+                        <div class="p-3 bg-rose-50 text-rose-600 rounded-xl">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Doadores</p>
+                            <h3 id="metric-doadores" class="text-2xl font-bold text-slate-800">...</h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-gray-200 flex items-center gap-4 shadow-sm hover-scale cursor-default">
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                            <i data-lucide="gift" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Doações</p>
+                            <h3 id="metric-doacoes" class="text-2xl font-bold text-slate-800">...</h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-gray-200 flex items-center gap-4 shadow-sm hover-scale cursor-default">
+                        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                            <i data-lucide="dollar-sign" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Arrecadado</p>
+                            <h3 id="metric-financeiro" class="text-2xl font-bold text-slate-800">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-gray-200 flex items-center gap-4 shadow-sm hover-scale cursor-default">
+                        <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                            <i data-lucide="package" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Itens Doados</p>
+                            <h3 id="metric-materiais" class="text-2xl font-bold text-slate-800">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navegação Interna / Filtros -->
+                <div
+                    class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6 border-b border-gray-150 pb-4">
+                    <div class="flex bg-gray-100/80 p-1 rounded-xl self-start border border-gray-200/50">
+                        <button onclick="switchAdminSubTab('doadores')" id="btn-sub-doadores"
+                            class="sub-tab-btn px-4 py-2 text-sm font-medium rounded-lg bg-white shadow-sm text-gray-800 focus:outline-none transition-all duration-200">
+                            Doadores
+                        </button>
+                        <button onclick="switchAdminSubTab('doacoes')" id="btn-sub-doacoes"
+                            class="sub-tab-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-800 focus:outline-none transition-all duration-200">
+                            Doações
+                        </button>
+                    </div>
+
+                    <div class="relative flex-1 max-w-xs">
+                        <input type="text" id="admin-search" oninput="filtrarTabelasAdmin()" placeholder="Buscar..."
+                            class="w-full border border-gray-300 pl-9 pr-4 py-2 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 outline-none">
+                        <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                    </div>
+                </div>
+
+                <!-- Tabela: Doadores -->
+                <div id="container-tabela-doadores"
+                    class="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <table class="w-full text-left text-sm text-gray-500">
+                        <thead
+                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3.5 font-bold">Nome</th>
+                                <th class="px-6 py-3.5 font-bold">Tipo</th>
+                                <th class="px-6 py-3.5 font-bold">CPF/CNPJ</th>
+                                <th class="px-6 py-3.5 font-bold">Cidade</th>
+                                <th class="px-6 py-3.5 font-bold">Data Nasc.</th>
+                                <th class="px-6 py-3.5 font-bold">Telefone</th>
+                                <th class="px-6 py-3.5 font-bold">E-mail</th>
+                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-doadores-body" class="divide-y divide-gray-200">
+                            <!-- Gerado Dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Tabela: Doações -->
+                <div id="container-tabela-doacoes"
+                    class="hidden overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <table class="w-full text-left text-sm text-gray-500">
+                        <thead
+                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3.5 font-bold">Doador</th>
+                                <th class="px-6 py-3.5 font-bold">Canal</th>
+                                <th class="px-6 py-3.5 font-bold">Tipo</th>
+                                <th class="px-6 py-3.5 font-bold">Detalhes</th>
+                                <th class="px-6 py-3.5 font-bold">Obs.</th>
+                                <th class="px-6 py-3.5 font-bold">Data</th>
+                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-doacoes-body" class="divide-y divide-gray-200">
+                            <!-- Gerado Dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB CONTROLE DE ESTOQUE -->
+            <div id="tab-estoque" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h2 class="text-xl font-bold mb-6 text-gray-700 flex items-center gap-2">
+                    <i data-lucide="package" class="w-5 h-5 text-rose-600"></i> Controle de Estoque da OS
+                </h2>
+
+                <!-- Cards de Métricas do Estoque (Consolidado por Conteúdo) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-rose-100/80 bg-rose-50/20 flex items-center gap-4 shadow-xs hover-scale cursor-default">
+                        <div class="p-3 bg-rose-100 text-rose-700 rounded-2xl border border-rose-200/50 flex-shrink-0">
+                            <i data-lucide="shopping-bag" class="w-6 h-6"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-bold text-rose-700 uppercase tracking-wider truncate">Total no Bazar</p>
+                            <h3 id="stock-metric-bazar" class="text-xl font-extrabold text-slate-900 tracking-tight leading-none mt-1">0 <span class="text-xs font-medium text-slate-400">un.</span></h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-amber-100/80 bg-amber-50/20 flex items-center gap-4 shadow-xs hover-scale cursor-default">
+                        <div class="p-3 bg-amber-100 text-amber-700 rounded-2xl border border-amber-200/50 flex-shrink-0">
+                            <i data-lucide="apple" class="w-6 h-6"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-bold text-amber-700 uppercase tracking-wider truncate">Total Alimentos</p>
+                            <h3 id="stock-metric-alimentos" class="text-xl font-extrabold text-slate-900 tracking-tight leading-none mt-1">0 <span class="text-xs font-medium text-slate-400">un.</span></h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-sky-100/80 bg-sky-50/20 flex items-center gap-4 shadow-xs hover-scale cursor-default">
+                        <div class="p-3 bg-sky-100 text-sky-700 rounded-2xl border border-sky-200/50 flex-shrink-0">
+                            <i data-lucide="droplet" class="w-6 h-6"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-bold text-sky-700 uppercase tracking-wider truncate">Total Higiene</p>
+                            <h3 id="stock-metric-higiene" class="text-xl font-extrabold text-slate-900 tracking-tight leading-none mt-1">0 <span class="text-xs font-medium text-slate-400">un.</span></h3>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white p-5 rounded-2xl border border-slate-200 flex items-center gap-4 shadow-xs hover-scale cursor-default">
+                        <div class="p-3 bg-slate-100 text-slate-700 rounded-2xl border border-slate-200/60 flex-shrink-0">
+                            <i data-lucide="package" class="w-6 h-6"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">Total Geral</p>
+                            <h3 id="stock-metric-total" class="text-xl font-extrabold text-slate-900 tracking-tight leading-none mt-1">0 <span class="text-xs font-medium text-slate-400">itens</span></h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navegação Interna de Estoque (Canais e Categorias Dedicadas) -->
+                <div class="space-y-4 mb-6 border-b border-gray-200 pb-6">
+                    <!-- Seção 1: Categorias Dedicadas e Itens Físicos (Destaque Principal ao Bazar) -->
+                    <div>
+                        <span class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Inventário de Conteúdo e Itens Doados</span>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="switchEstoqueSubTab('Bazar')" id="btn-est-Bazar"
+                                class="estoque-sub-btn px-4 py-2.5 text-xs font-bold rounded-xl bg-rose-600 text-white border border-rose-600 shadow-sm focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-2">
+                                <i data-lucide="shopping-bag" class="w-4 h-4"></i> 🛍️ Local Dedicado ao Bazar
+                            </button>
+                            <button onclick="switchEstoqueSubTab('Alimentos')" id="btn-est-Alimentos"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="apple" class="w-3.5 h-3.5"></i> Alimentos / Cesta Básica
+                            </button>
+                            <button onclick="switchEstoqueSubTab('Higiene')" id="btn-est-Higiene"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="droplet" class="w-3.5 h-3.5"></i> Higiene
+                            </button>
+                            <button onclick="switchEstoqueSubTab('Cabelo')" id="btn-est-Cabelo"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Cabelo (Perucas)
+                            </button>
+                            <button onclick="switchEstoqueSubTab('Ortopedicos')" id="btn-est-Ortopedicos"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="accessibility" class="w-3.5 h-3.5"></i> Equip. Ortopédicos
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Seção 2: Entradas por Canal -->
+                    <div>
+                        <span class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Entradas por Canal (Histórico Geral)</span>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="switchEstoqueSubTab('Presencial')" id="btn-est-Presencial"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i> Presencial
+                            </button>
+                            <button onclick="switchEstoqueSubTab('PIX')" id="btn-est-PIX"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="zap" class="w-3.5 h-3.5"></i> PIX
+                            </button>
+                            <button onclick="switchEstoqueSubTab('Dinheiro')" id="btn-est-Dinheiro"
+                                class="estoque-sub-btn px-3.5 py-2 text-xs font-medium rounded-xl bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-1.5">
+                                <i data-lucide="banknote" class="w-3.5 h-3.5"></i> Dinheiro
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Banner de Estoque Consolidado e Modo de Exibição -->
+                <div id="banner-estoque-materiais" class="hidden mb-6 bg-slate-50 border border-slate-200/80 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <div id="banner-icon-container" class="p-3 bg-rose-100 text-rose-700 rounded-xl">
+                            <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 id="banner-titulo-subtab" class="font-bold text-slate-800 text-sm">Resumo Consolidado do Estoque: Bazar</h4>
+                            <p id="banner-subtitulo-subtab" class="text-xs text-slate-500">Exibindo quantitativo acumulado de doações registradas para este conteúdo.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 text-xs font-medium self-end sm:self-auto">
+                        <button type="button" onclick="alterarModoVisaoEstoque('consolidado')" id="btn-visao-consolidado"
+                            class="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-semibold transition cursor-pointer shadow-xs">
+                            Soma Consolidada
+                        </button>
+                        <button type="button" onclick="alterarModoVisaoEstoque('lotes')" id="btn-visao-lotes"
+                            class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                            Lotes Individuais
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Busca e Filtros -->
+                <div class="flex justify-between items-center mb-6">
+                    <div class="relative flex-1 max-w-md">
+                        <input type="text" id="stock-search" oninput="filtrarEstoque()"
+                            placeholder="Buscar nesta categoria..."
+                            class="w-full border border-gray-300 pl-9 pr-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 outline-none">
+                        <i data-lucide="search" class="absolute left-3 top-3.5 w-4 h-4 text-gray-400"></i>
+                    </div>
+                </div>
+
+                <!-- Tabela: Visualização por Canais (Doações) -->
+                <div id="container-estoque-canais"
+                    class="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <table class="w-full text-left text-sm text-gray-500">
+                        <thead
+                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3.5 font-bold">Data</th>
+                                <th class="px-6 py-3.5 font-bold">Tipo</th>
+                                <th class="px-6 py-3.5 font-bold">Descrição / Detalhes</th>
+                                <th class="px-6 py-3.5 font-bold">Estado / Destino</th>
+                                <th class="px-6 py-3.5 font-bold">Obs.</th>
+                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-estoque-canais-body" class="divide-y divide-gray-200">
+                            <!-- Gerado Dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Tabela: Visualização por Categorias (Itens Físicos) -->
+                <div id="container-estoque-materiais"
+                    class="hidden overflow-x-auto rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <table class="w-full text-left text-sm text-gray-500">
+                        <thead id="tabela-estoque-materiais-head"
+                            class="bg-gray-50/80 backdrop-blur-sm text-xs text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3.5 font-bold">Descrição do Item</th>
+                                <th class="px-6 py-3.5 font-bold text-center">Quantidade Acumulada</th>
+                                <th class="px-6 py-3.5 font-bold">Unidade</th>
+                                <th class="px-6 py-3.5 font-bold">Estado de Conservação</th>
+                                <th class="px-6 py-3.5 font-bold">Destino Atual</th>
+                                <th class="px-6 py-3.5 font-bold">Entradas / Lotes</th>
+                                <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-estoque-materiais-body" class="divide-y divide-gray-200">
+                            <!-- Gerado Dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- MODAL EDITAR ESTOQUE -->
+        <div id="modal-editar-estoque"
+            class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 modal-overlay">
+            <div
+                class="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-2xl w-full overflow-hidden transform transition-all duration-300 modal-dialog">
+                <div class="bg-rose-600 text-white px-6 py-4 flex justify-between items-center">
+                    <h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="package" class="w-5 h-5"></i>
+                        Editar Item de Estoque</h3>
+                    <button type="button" onclick="fecharModalEditarEstoque()"
+                        class="text-white hover:text-rose-200 hover:bg-rose-700/50 p-1.5 rounded-lg cursor-pointer transition flex items-center justify-center"
+                        aria-label="Fechar">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <form id="form-editar-estoque" class="p-6 space-y-4">
+                    <input type="hidden" id="edit-stock-id">
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1 text-gray-600">Descrição do Item *</label>
+                        <input type="text" id="edit-stock-descricao" required
+                            class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Categoria *</label>
+                            <select id="edit-stock-categoria" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                <!-- Categorias carregadas dinamicamente -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Quantidade *</label>
+                            <input type="number" id="edit-stock-qtd" min="1" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Unidade de Medida *</label>
+                            <select id="edit-stock-unidade" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                <option value="Unidade">Unidade</option>
+                                <option value="Pacote">Pacote</option>
+                                <option value="Kg">Kg</option>
+                                <option value="Cm">Cm</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Estado de Conservação
+                                *</label>
+                            <select id="edit-stock-estado" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                <option value="Não se aplica">Não se aplica</option>
+                                <option value="Novo">Novo</option>
+                                <option value="Seminovo">Seminovo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Destino Atual *</label>
+                            <select id="edit-stock-destino" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                <option value="Estoque Geral">Estoque Geral</option>
+                                <option value="Uso Direto Paciente">Uso Direto Paciente</option>
+                                <option value="Bazar">Bazar</option>
+                                <option value="Consumo Interno">Consumo Interno</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end gap-3 border-t">
+                        <button type="button" onclick="fecharModalEditarEstoque()"
+                            class="bg-gray-150 hover:bg-gray-200 text-gray-800 font-medium py-2.5 px-6 rounded-xl cursor-pointer">Cancelar</button>
+                        <button type="submit"
+                            class="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-6 rounded-xl cursor-pointer hover-scale shadow-sm">Salvar
+                            Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL EDITAR DOADOR -->
+        <div id="modal-editar-doador"
+            class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 modal-overlay">
+            <div
+                class="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-xl w-full overflow-hidden transform transition-all duration-300 modal-dialog">
+                <div class="bg-rose-600 text-white px-6 py-4 flex justify-between items-center">
+                    <h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="user" class="w-5 h-5"></i>
+                        Editar Cadastro de Doador</h3>
+                    <button type="button" onclick="fecharModalEditarDoador()"
+                        class="text-white hover:text-rose-200 hover:bg-rose-700/50 p-1.5 rounded-lg cursor-pointer transition flex items-center justify-center"
+                        aria-label="Fechar">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <form id="form-editar-doador" class="p-6 space-y-4">
+                    <input type="hidden" id="edit-doador-id">
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1 text-gray-600">Nome / Razão Social *</label>
+                        <input type="text" id="edit-doador-nome" required
+                            class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Tipo de Doador *</label>
+                            <div
+                                class="flex bg-gray-100 p-1 rounded-xl border border-gray-200/50 h-[48px] items-center">
+                                <button type="button" id="btn-edit-doador-pf" onclick="selecionarTipoDoadorEdit('PF')"
+                                    class="flex-1 h-full text-sm font-semibold rounded-lg bg-white shadow-sm text-rose-600 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5">
+                                    <i data-lucide="user" class="w-4 h-4"></i> PF (CPF)
+                                </button>
+                                <button type="button" id="btn-edit-doador-pj" onclick="selecionarTipoDoadorEdit('PJ')"
+                                    class="flex-1 h-full text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-800 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5">
+                                    <i data-lucide="building-2" class="w-4 h-4"></i> PJ (CNPJ)
+                                </button>
+                            </div>
+                            <input type="hidden" id="edit-doador-tipo" value="PF">
+                        </div>
+                        <div>
+                            <label id="edit-label-doador-documento"
+                                class="block text-sm font-semibold mb-1 text-gray-600">CPF *</label>
+                            <input type="text" id="edit-doador-documento"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Telefone</label>
+                            <input type="tel" id="edit-doador-telefone"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">E-mail</label>
+                            <input type="email" id="edit-doador-email"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Cidade</label>
+                            <input type="text" id="edit-doador-cidade"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none"
+                                placeholder="Ex: Catanduva - SP">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Data de Nascimento</label>
+                            <input type="date" id="edit-doador-data-nascimento"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl outline-none">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end gap-3 border-t">
+                        <button type="button" onclick="fecharModalEditarDoador()"
+                            class="bg-gray-150 hover:bg-gray-200 text-gray-800 font-medium py-2.5 px-6 rounded-xl cursor-pointer">Cancelar</button>
+                        <button type="submit"
+                            class="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-6 rounded-xl cursor-pointer hover-scale shadow-sm">Salvar
+                            Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL EDITAR DOAÇÃO -->
+        <div id="modal-editar-doacao"
+            class="hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 modal-overlay">
+            <div
+                class="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-3xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 modal-dialog">
+                <div class="bg-rose-600 text-white px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+                    <h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="gift" class="w-5 h-5"></i>
+                        Editar Registro de Doação</h3>
+                    <button type="button" onclick="fecharModalEditarDoacao()"
+                        class="text-white hover:text-rose-200 hover:bg-rose-700/50 p-1.5 rounded-lg cursor-pointer transition flex items-center justify-center"
+                        aria-label="Fechar">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <form id="form-editar-doacao" class="p-6 space-y-6">
+                    <input type="hidden" id="edit-doacao-id">
+
+                    <div
+                        class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/50 p-5 rounded-2xl border border-gray-200/60">
+                        <div class="relative" id="container-search-doador-edit">
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Doador Vinculado *</label>
+                            <div class="relative">
+                                <input type="text" id="edit-doador-search-input" autocomplete="off"
+                                    placeholder="🔍 Pesquisar por nome, CPF/CNPJ..."
+                                    oninput="filtrarDoadoresInput('edit', this.value)"
+                                    onfocus="abrirDropdownDoadores('edit')"
+                                    class="w-full border border-gray-300 p-2.5 pr-9 rounded-xl bg-white outline-none text-slate-800 text-sm font-medium transition focus:border-rose-600">
+                                <button type="button" id="btn-clear-doador-edit" onclick="limparSelecaoDoador('edit')"
+                                    class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-600 p-1 cursor-pointer rounded-lg hover:bg-gray-100 transition">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <select id="edit-doacao-id-doador" required class="sr-only opacity-0 h-0 w-0 absolute pointer-events-none">
+                                <option value="">Selecione um doador</option>
+                            </select>
+                            <div id="dropdown-doadores-edit"
+                                class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-gray-100 transition-all">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Canal de Recebimento *</label>
+                            <select id="edit-doacao-canal" required
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                <option value="Presencial">Presencial</option>
+                                <option value="PIX">PIX</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-semibold mb-1 text-gray-600">Observações Gerais</label>
+                            <input type="text" id="edit-doacao-observacoes"
+                                class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Conteúdo da Doação</h3>
+                        <div class="flex flex-wrap gap-4">
+                            <label
+                                class="inline-flex items-center cursor-pointer bg-slate-50/50 p-3 rounded-xl border border-gray-200 hover:bg-slate-100 transition">
+                                <input type="checkbox" id="edit-check-financeiro" class="accent-rose-600 mr-2"
+                                    onchange="toggleSubForm('edit-sub-financeiro', this)">
+                                <span class="text-sm font-medium text-gray-700">Possui Valor Financeiro</span>
+                            </label>
+                            <label
+                                class="inline-flex items-center cursor-pointer bg-slate-50/50 p-3 rounded-xl border border-gray-200 hover:bg-slate-100 transition">
+                                <input type="checkbox" id="edit-check-material" class="accent-rose-600 mr-2"
+                                    onchange="toggleSubForm('edit-sub-material', this)">
+                                <span class="text-sm font-medium text-gray-700">Possui Itens Físicos</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Dados Financeiros -->
+                    <div id="edit-sub-financeiro"
+                        class="hidden p-5 border-l-4 border-emerald-500 bg-emerald-50/20 rounded-r-2xl border-t border-b border-r border-emerald-100/50 space-y-4">
+                        <h4 class="font-bold text-emerald-800 text-sm">Dados Financeiros</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Valor (R$)</label>
+                                <input type="number" id="edit-fin-valor" step="0.01"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Comprovante / ID
+                                    Transação</label>
+                                <input type="text" id="edit-fin-comprovante"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dados do Material -->
+                    <div id="edit-sub-material"
+                        class="hidden p-5 border-l-4 border-blue-500 bg-blue-50/20 rounded-r-2xl border-t border-b border-r border-blue-100/50 space-y-4">
+                        <h4 class="font-bold text-blue-800 text-sm flex items-center justify-between">
+                            <span>Dados do Material/Item Físico</span>
+                            <span class="text-xs font-normal text-blue-600">Selecione o conteúdo abaixo para preenchimento rápido</span>
+                        </h4>
+
+                        <!-- SELEÇÃO RÁPIDA DE CONTEÚDO (EDIT) -->
+                        <div class="bg-white p-3.5 rounded-xl border border-blue-200/80 shadow-xs">
+                            <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-slate-700">Alterar Conteúdo do Item:</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                <button type="button" onclick="selecionarPresetConteudo('bazar', 'edit')" id="preset-edit-bazar"
+                                    class="preset-btn-edit p-2.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="shopping-bag" class="w-5 h-5 text-rose-600"></i>
+                                    <span>🛍️ Bazar / Vestuário</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('alimentos', 'edit')" id="preset-edit-alimentos"
+                                    class="preset-btn-edit p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="apple" class="w-5 h-5 text-amber-600"></i>
+                                    <span>🍞 Alimentos</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('higiene', 'edit')" id="preset-edit-higiene"
+                                    class="preset-btn-edit p-2.5 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-sky-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="droplet" class="w-5 h-5 text-sky-600"></i>
+                                    <span>🧴 Higiene</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('cabelo', 'edit')" id="preset-edit-cabelo"
+                                    class="preset-btn-edit p-2.5 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100 text-purple-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="sparkles" class="w-5 h-5 text-purple-600"></i>
+                                    <span>💇 Cabelo / Perucas</span>
+                                </button>
+                                <button type="button" onclick="selecionarPresetConteudo('ortopedicos', 'edit')" id="preset-edit-ortopedicos"
+                                    class="preset-btn-edit p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs transition cursor-pointer flex flex-col items-center gap-1 text-center">
+                                    <i data-lucide="accessibility" class="w-5 h-5 text-emerald-600"></i>
+                                    <span>♿ Ortopédicos</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="sm:col-span-2">
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Descrição do Item *</label>
+                                <input type="text" id="edit-mat-descricao"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Categoria *</label>
+                                <select id="edit-mat-categoria"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <!-- Categorias carregadas dinamicamente -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Quantidade *</label>
+                                <input type="number" id="edit-mat-qtd" min="1"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none font-bold text-slate-800">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Unidade de Medida</label>
+                                <select id="edit-mat-unidade"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <option value="Unidade">Unidade</option>
+                                    <option value="Pacote">Pacote</option>
+                                    <option value="Kg">Kg</option>
+                                    <option value="Cm">Cm</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Estado de Conservação</label>
+                                <select id="edit-mat-estado"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <option value="Não se aplica">Não se aplica</option>
+                                    <option value="Novo">Novo</option>
+                                    <option value="Seminovo">Seminovo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-gray-600">Destino Inicial *</label>
+                                <select id="edit-mat-destino"
+                                    class="w-full border border-gray-300 p-2.5 rounded-xl bg-white outline-none">
+                                    <option value="Estoque Geral">Estoque Geral</option>
+                                    <option value="Uso Direto Paciente">Uso Direto Paciente</option>
+                                    <option value="Bazar">Bazar</option>
+                                    <option value="Consumo Interno">Consumo Interno</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end gap-3 border-t">
+                        <button type="button" onclick="fecharModalEditarDoacao()"
+                            class="bg-gray-150 hover:bg-gray-200 text-gray-800 font-medium py-2.5 px-6 rounded-xl cursor-pointer">Cancelar</button>
+                        <button type="submit"
+                            class="bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-6 rounded-xl cursor-pointer hover-scale shadow-sm">Salvar
+                            Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://bevvvsghutwpnexuczda.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_CaMU6q53y-n9p0PXW4F1Ow_bgYrD9Mm";
+
+        // Inicialização do cliente Supabase usando nome que não conflita com o global da CDN
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ==========================================
+        // SISTEMA DE NOTIFICAÇÃO TOAST MODERNIZADO
+        // ==========================================
+        function mostrarToast(mensagem, tipo = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = `toast-item p-4 rounded-xl shadow-lg border backdrop-blur-md flex items-center gap-3 transition-all duration-300 pointer-events-auto cursor-pointer max-w-sm w-full`;
+
+            let bgClass = '';
+            let iconName = '';
+            if (tipo === 'success') {
+                bgClass = 'bg-emerald-50/95 border-emerald-150 text-emerald-800 shadow-emerald-500/5';
+                iconName = 'check-circle-2';
+            } else if (tipo === 'error') {
+                bgClass = 'bg-rose-50/95 border-rose-150 text-rose-800 shadow-rose-500/5';
+                iconName = 'alert-circle';
+            } else {
+                bgClass = 'bg-blue-50/95 border-blue-150 text-blue-800 shadow-blue-500/5';
+                iconName = 'info';
+            }
+
+            toast.className += ` ${bgClass}`;
+            toast.innerHTML = `
+                <i data-lucide="${iconName}" class="w-5 h-5 flex-shrink-0"></i>
+                <span class="text-sm font-semibold">${mensagem}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            // Auto-remover após 4 segundos com transição de fade/slide
+            const removerToast = () => {
+                toast.style.transform = 'translateY(-12px) scale(0.95)';
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            };
+
+            toast.addEventListener('click', removerToast);
+            setTimeout(removerToast, 4000);
+        }
+
+        // ==========================================
+        // FUNÇÕES DE FORMATAÇÃO E MÁSCARAS DE INPUT
+        // ==========================================
+
+        function formatarCPF(val) {
+            val = val.replace(/\D/g, "").slice(0, 11);
+            return val
+                .replace(/^(\d{3})(\d)/, "$1.$2")
+                .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+                .replace(/\.(\d{3})(\d)/, ".$1-$2");
+        }
+
+        function formatarCNPJ(val) {
+            val = val.replace(/\D/g, "").slice(0, 14);
+            return val
+                .replace(/^(\d{2})(\d)/, "$1.$2")
+                .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+                .replace(/\.(\d{3})(\d)/, ".$1/$2")
+                .replace(/(\d{4})(\d)/, "$1-$2");
+        }
+
+        function formatarDocumento(val, tipo) {
+            if (!val) return "";
+            if (tipo === 'PF') {
+                return formatarCPF(val);
+            } else if (tipo === 'PJ') {
+                return formatarCNPJ(val);
+            } else {
+                const clean = val.replace(/\D/g, "");
+                if (clean.length > 11) {
+                    return formatarCNPJ(clean);
+                } else {
+                    return formatarCPF(clean);
+                }
+            }
+        }
+
+        function formatarTelefone(val) {
+            if (!val) return "";
+            val = val.replace(/\D/g, "").slice(0, 11);
+            if (val.length > 10) {
+                return val
+                    .replace(/^(\d{2})(\d)/, "($1) $2")
+                    .replace(/(\d{5})(\d)/, "$1-$2");
+            } else {
+                return val
+                    .replace(/^(\d{2})(\d)/, "($1) $2")
+                    .replace(/(\d{4})(\d)/, "$1-$2");
+            }
+        }
+
+        function aplicarMascaraInput(inputElement, formatarFn) {
+            if (!inputElement) return;
+
+            inputElement.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace') {
+                    const pos = inputElement.selectionStart;
+                    const val = inputElement.value;
+                    if (pos > 0 && /\D/.test(val[pos - 1])) {
+                        e.preventDefault();
+                        const digits = val.slice(0, pos).replace(/\D/g, "");
+                        if (digits.length > 0) {
+                            const newDigits = digits.slice(0, -1);
+                            const remaining = val.slice(pos).replace(/\D/g, "");
+                            const combined = newDigits + remaining;
+                            inputElement.value = formatarFn(combined);
+
+                            const targetDigitsCount = newDigits.length;
+                            let newPos = 0;
+                            let digitsCount = 0;
+                            while (newPos < inputElement.value.length && digitsCount < targetDigitsCount) {
+                                if (/\d/.test(inputElement.value[newPos])) {
+                                    digitsCount++;
+                                }
+                                newPos++;
+                            }
+                            inputElement.setSelectionRange(newPos, newPos);
+                        }
+                    }
+                }
+            });
+
+            inputElement.addEventListener('input', (e) => {
+                const cursorPosition = inputElement.selectionStart;
+                const oldVal = inputElement.value;
+                const newVal = formatarFn(oldVal);
+
+                if (newVal === oldVal) return;
+
+                inputElement.value = newVal;
+
+                const digitsBeforeCursor = oldVal.slice(0, cursorPosition).replace(/\D/g, "").length;
+
+                let newPos = 0;
+                let digitsCount = 0;
+                while (newPos < newVal.length && digitsCount < digitsBeforeCursor) {
+                    if (/\d/.test(newVal[newPos])) {
+                        digitsCount++;
+                    }
+                    newPos++;
+                }
+
+                if (newPos < newVal.length && /\D/.test(newVal[newPos]) && e.inputType === 'insertText') {
+                    while (newPos < newVal.length && /\D/.test(newVal[newPos])) {
+                        newPos++;
+                    }
+                }
+
+                inputElement.setSelectionRange(newPos, newPos);
+            });
+        }
+
+        function inicializarMascaras() {
+            const inputDoc = document.getElementById('doador-documento');
+            const selectTipo = document.getElementById('doador-tipo');
+            const inputTel = document.getElementById('doador-telefone');
+
+            const inputDocEdit = document.getElementById('edit-doador-documento');
+            const selectTipoEdit = document.getElementById('edit-doador-tipo');
+            const inputTelEdit = document.getElementById('edit-doador-telefone');
+
+            function ajustarDocumentoInput(input, select) {
+                const tipo = select.value;
+                const isEdit = input.id.includes('edit');
+                const label = document.getElementById(isEdit ? 'edit-label-doador-documento' : 'label-doador-documento');
+
+                if (tipo === 'PF') {
+                    input.placeholder = "000.000.000-00";
+                    input.maxLength = 14;
+                    if (label) label.textContent = "CPF *";
+                } else {
+                    input.placeholder = "00.000.000/0000-00";
+                    input.maxLength = 18;
+                    if (label) label.textContent = "CNPJ *";
+                }
+                input.value = formatarDocumento(input.value, tipo);
+            }
+
+            if (selectTipo && inputDoc) {
+                selectTipo.addEventListener('change', () => ajustarDocumentoInput(inputDoc, selectTipo));
+                aplicarMascaraInput(inputDoc, (val) => formatarDocumento(val, selectTipo.value));
+                ajustarDocumentoInput(inputDoc, selectTipo);
+            }
+
+            if (selectTipoEdit && inputDocEdit) {
+                selectTipoEdit.addEventListener('change', () => ajustarDocumentoInput(inputDocEdit, selectTipoEdit));
+                aplicarMascaraInput(inputDocEdit, (val) => formatarDocumento(val, selectTipoEdit.value));
+            }
+
+            if (inputTel) {
+                inputTel.maxLength = 15;
+                aplicarMascaraInput(inputTel, formatarTelefone);
+            }
+
+            if (inputTelEdit) {
+                inputTelEdit.maxLength = 15;
+                aplicarMascaraInput(inputTelEdit, formatarTelefone);
+            }
+        }
+
+        function selecionarTipoDoador(tipo) {
+            const inputTipo = document.getElementById('doador-tipo');
+            if (!inputTipo) return;
+            inputTipo.value = tipo;
+
+            inputTipo.dispatchEvent(new Event('change'));
+
+            const btnPf = document.getElementById('btn-doador-pf');
+            const btnPj = document.getElementById('btn-doador-pj');
+
+            if (tipo === 'PF') {
+                btnPf.className = "flex-1 h-full text-sm font-semibold rounded-lg bg-white shadow-sm text-rose-600 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+                btnPj.className = "flex-1 h-full text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-800 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+            } else {
+                btnPf.className = "flex-1 h-full text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-800 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+                btnPj.className = "flex-1 h-full text-sm font-semibold rounded-lg bg-white shadow-sm text-rose-600 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+            }
+        }
+
+        function selecionarTipoDoadorEdit(tipo) {
+            const inputTipo = document.getElementById('edit-doador-tipo');
+            if (!inputTipo) return;
+            inputTipo.value = tipo;
+
+            inputTipo.dispatchEvent(new Event('change'));
+
+            const btnPf = document.getElementById('btn-edit-doador-pf');
+            const btnPj = document.getElementById('btn-edit-doador-pj');
+
+            if (tipo === 'PF') {
+                btnPf.className = "flex-1 h-full text-sm font-semibold rounded-lg bg-white shadow-sm text-rose-600 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+                btnPj.className = "flex-1 h-full text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-800 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+            } else {
+                btnPf.className = "flex-1 h-full text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-800 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+                btnPj.className = "flex-1 h-full text-sm font-semibold rounded-lg bg-white shadow-sm text-rose-600 focus:outline-none transition-all duration-200 text-center cursor-pointer flex items-center justify-center gap-1.5";
+            }
+        }
+
+        document.getElementById('form-doador').addEventListener('reset', () => {
+            setTimeout(() => selecionarTipoDoador('PF'), 0);
+        });
+
+        document.getElementById('form-editar-doador').addEventListener('reset', () => {
+            setTimeout(() => selecionarTipoDoadorEdit('PF'), 0);
+        });
+
+        // ==========================================
+        // CONTROLES DE LAYOUT, MODAIS E CARREGAMENTO
+        // ==========================================
+
+        function exibirCarregamentoGlobal() {
+            const bar = document.getElementById('global-progress-bar');
+            if (!bar) return;
+            bar.style.opacity = '1';
+            bar.style.width = '0%';
+            setTimeout(() => { bar.style.width = '30%'; }, 50);
+            setTimeout(() => { bar.style.width = '70%'; }, 200);
+        }
+
+        function ocultarCarregamentoGlobal() {
+            const bar = document.getElementById('global-progress-bar');
+            if (!bar) return;
+            bar.style.width = '100%';
+            setTimeout(() => {
+                bar.style.opacity = '0';
+                setTimeout(() => {
+                    bar.style.width = '0%';
+                }, 300);
+            }, 200);
+        }
+
+        function mostrarModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            const dialog = modal.querySelector('.modal-dialog');
+
+            modal.classList.remove('hidden');
+            modal.offsetHeight; // Force reflow
+
+            modal.classList.add('show');
+            if (dialog) dialog.classList.add('show');
+        }
+
+        function fecharModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            const dialog = modal.querySelector('.modal-dialog');
+
+            modal.classList.remove('show');
+            if (dialog) dialog.classList.remove('show');
+
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function exibirSkeletonTabela(tbodyId, colSpan) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="${colSpan}" class="px-6 py-10 text-center text-gray-400">
+                        <div class="flex flex-col items-center justify-center gap-3">
+                            <div class="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span class="text-xs font-medium text-gray-500 animate-pulse">Carregando dados com segurança...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        async function verificarAutenticacaoGlobal() {
+            exibirCarregamentoGlobal();
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            ocultarCarregamentoGlobal();
+
+            if (session || sessionStorage.getItem('app_autenticado') === 'true') {
+                sessionStorage.setItem('app_autenticado', 'true');
+                document.getElementById('global-login-container').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                lucide.createIcons();
+            } else {
+                document.getElementById('global-login-container').classList.remove('hidden');
+                document.getElementById('app-container').classList.add('hidden');
+                const emailInput = document.getElementById('global-email-input');
+                if (emailInput) emailInput.focus();
+            }
+        }
+
+        async function loginGlobal(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('global-email-input');
+            const passwordInput = document.getElementById('global-password-input');
+            const errorMsg = document.getElementById('global-login-error-msg');
+
+            exibirCarregamentoGlobal();
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: emailInput.value,
+                password: passwordInput.value
+            });
+            ocultarCarregamentoGlobal();
+
+            if (error) {
+                errorMsg.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i> ${error.message}`;
+                errorMsg.classList.remove('hidden');
+                lucide.createIcons();
+                passwordInput.value = '';
+                passwordInput.focus();
+            } else {
+                sessionStorage.setItem('app_autenticado', 'true');
+                errorMsg.classList.add('hidden');
+
+                document.getElementById('global-login-container').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                lucide.createIcons();
+            }
+        }
+
+        async function logoutGlobal() {
+            exibirCarregamentoGlobal();
+            await supabaseClient.auth.signOut();
+            ocultarCarregamentoGlobal();
+
+            sessionStorage.removeItem('app_autenticado');
+            document.getElementById('app-container').classList.add('hidden');
+            document.getElementById('global-login-container').classList.remove('hidden');
+
+            const emailInput = document.getElementById('global-email-input');
+            const passwordInput = document.getElementById('global-password-input');
+            if (emailInput) emailInput.value = '';
+            if (passwordInput) passwordInput.value = '';
+            document.getElementById('global-login-error-msg').classList.add('hidden');
+            if (emailInput) emailInput.focus();
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            exibirCarregamentoGlobal();
+            verificarAutenticacaoGlobal();
+            Promise.all([
+                carregarDoadores(),
+                carregarCategorias()
+            ]).finally(() => {
+                ocultarCarregamentoGlobal();
+                lucide.createIcons();
+            });
+            inicializarMascaras();
+        });
+
+        // Lista global de doadores para busca e autocomplete
+        let listaDoadoresGlobal = [];
+
+        async function carregarDoadores() {
+            const { data, error } = await supabaseClient
+                .from('doadores')
+                .select('id_doador, nome, tipo_doador, documento, telefone, email')
+                .order('nome');
+            if (error) return console.error('Erro ao carregar doadores:', error);
+
+            listaDoadoresGlobal = data || [];
+
+            const selectForm = document.getElementById('doacao-id-doador');
+            const selectEdit = document.getElementById('edit-doacao-id-doador');
+            
+            let htmlOpts = '<option value="">-- Selecione um Doador --</option>';
+            listaDoadoresGlobal.forEach(doador => {
+                htmlOpts += `<option value="${doador.id_doador}">${doador.nome}</option>`;
+            });
+
+            if (selectForm) selectForm.innerHTML = htmlOpts;
+            if (selectEdit) selectEdit.innerHTML = htmlOpts;
+
+            renderizarDropdownDoadores('form', listaDoadoresGlobal);
+            renderizarDropdownDoadores('edit', listaDoadoresGlobal);
+        }
+
+        function renderizarDropdownDoadores(contexto, lista) {
+            const dropdown = document.getElementById(contexto === 'form' ? 'dropdown-doadores-form' : 'dropdown-doadores-edit');
+            if (!dropdown) return;
+
+            if (lista.length === 0) {
+                dropdown.innerHTML = `
+                    <div class="p-4 text-center text-xs text-gray-400 font-medium">
+                        Nenhum doador encontrado com esse nome ou documento.
+                    </div>
+                `;
+                return;
+            }
+
+            dropdown.innerHTML = '';
+            lista.forEach(d => {
+                const item = document.createElement('div');
+                item.className = "p-3 hover:bg-rose-50/80 cursor-pointer flex items-center justify-between transition border-b border-gray-50 last:border-0";
+                
+                const docFmt = formatarDocumento(d.documento || '', d.tipo_doador);
+                const telFmt = formatarTelefone(d.telefone || '');
+                const badge = d.tipo_doador === 'PF' 
+                    ? '<span class="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px] mr-1.5">PF</span>'
+                    : '<span class="inline-block px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-bold text-[10px] mr-1.5">PJ</span>';
+
+                let infoAdicional = [];
+                if (docFmt) infoAdicional.push(`Doc: ${docFmt}`);
+                if (telFmt) infoAdicional.push(`Tel: ${telFmt}`);
+
+                item.innerHTML = `
+                    <div class="min-w-0 flex-1">
+                        <div class="font-semibold text-sm text-slate-800 flex items-center gap-1 truncate">
+                            ${badge}
+                            <span class="truncate">${d.nome}</span>
+                        </div>
+                        ${infoAdicional.length > 0 ? `<div class="text-[11px] text-gray-500 mt-0.5 truncate">${infoAdicional.join(' | ')}</div>` : ''}
+                    </div>
+                    <i data-lucide="check" class="w-4 h-4 text-rose-600 opacity-0 group-hover:opacity-100 flex-shrink-0 ml-2"></i>
+                `;
+
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    selecionarDoador(contexto, d.id_doador, d.nome);
+                });
+
+                dropdown.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        function abrirDropdownDoadores(contexto) {
+            const dropdown = document.getElementById(contexto === 'form' ? 'dropdown-doadores-form' : 'dropdown-doadores-edit');
+            if (dropdown) dropdown.classList.remove('hidden');
+        }
+
+        function fecharDropdownDoadores(contexto) {
+            const dropdown = document.getElementById(contexto === 'form' ? 'dropdown-doadores-form' : 'dropdown-doadores-edit');
+            if (dropdown) dropdown.classList.add('hidden');
+        }
+
+        function filtrarDoadoresInput(contexto, termo) {
+            abrirDropdownDoadores(contexto);
+            const query = (termo || '').toLowerCase().trim();
+            if (!query) {
+                renderizarDropdownDoadores(contexto, listaDoadoresGlobal);
+                return;
+            }
+
+            const filtrados = listaDoadoresGlobal.filter(d => {
+                const nomeMatch = d.nome.toLowerCase().includes(query);
+                const docMatch = d.documento && d.documento.includes(query);
+                const telMatch = d.telefone && d.telefone.includes(query);
+                const emailMatch = d.email && d.email.toLowerCase().includes(query);
+                return nomeMatch || docMatch || telMatch || emailMatch;
+            });
+
+            renderizarDropdownDoadores(contexto, filtrados);
+        }
+
+        function selecionarDoador(contexto, id, nome) {
+            const select = document.getElementById(contexto === 'form' ? 'doacao-id-doador' : 'edit-doacao-id-doador');
+            const input = document.getElementById(contexto === 'form' ? 'doador-search-input' : 'edit-doador-search-input');
+            const btnClear = document.getElementById(contexto === 'form' ? 'btn-clear-doador-form' : 'btn-clear-doador-edit');
+
+            if (select) select.value = id;
+            if (input) {
+                input.value = nome;
+                input.classList.add('bg-rose-50/50', 'border-rose-300', 'font-semibold');
+            }
+            if (btnClear) btnClear.classList.remove('hidden');
+
+            fecharDropdownDoadores(contexto);
+        }
+
+        function limparSelecaoDoador(contexto) {
+            const select = document.getElementById(contexto === 'form' ? 'doacao-id-doador' : 'edit-doacao-id-doador');
+            const input = document.getElementById(contexto === 'form' ? 'doador-search-input' : 'edit-doador-search-input');
+            const btnClear = document.getElementById(contexto === 'form' ? 'btn-clear-doador-form' : 'btn-clear-doador-edit');
+
+            if (select) select.value = '';
+            if (input) {
+                input.value = '';
+                input.classList.remove('bg-rose-50/50', 'border-rose-300', 'font-semibold');
+            }
+            if (btnClear) btnClear.classList.add('hidden');
+
+            renderizarDropdownDoadores(contexto, listaDoadoresGlobal);
+        }
+
+        document.addEventListener('click', (e) => {
+            const containerForm = document.getElementById('container-search-doador-form');
+            const containerEdit = document.getElementById('container-search-doador-edit');
+
+            if (containerForm && !containerForm.contains(e.target)) {
+                fecharDropdownDoadores('form');
+            }
+            if (containerEdit && !containerEdit.contains(e.target)) {
+                fecharDropdownDoadores('edit');
+            }
+        });
+
+        async function carregarCategorias() {
+            const { data, error } = await supabaseClient.from('categorias_itens').select('id_categoria, nome_categoria').order('id_categoria');
+            if (error) return console.error('Erro ao carregar categorias:', error);
+
+            const select = document.getElementById('mat-categoria');
+            select.innerHTML = '';
+            data.forEach(cat => {
+                select.innerHTML += `<option value="${cat.id_categoria}">${cat.nome_categoria}</option>`;
+            });
+        }
+
+        // SALVAR DOADOR
+        document.getElementById('form-doador').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            exibirCarregamentoGlobal();
+
+            const novoDoador = {
+                nome: document.getElementById('doador-nome').value,
+                tipo_doador: document.getElementById('doador-tipo').value,
+                documento: document.getElementById('doador-documento').value || null,
+                telefone: document.getElementById('doador-telefone').value || null,
+                email: document.getElementById('doador-email').value || null,
+                cidade: document.getElementById('doador-cidade').value || null,
+                data_nascimento: document.getElementById('doador-data-nascimento').value || null
+            };
+
+            const { data, error } = await supabaseClient.from('doadores').insert([novoDoador]).select();
+            ocultarCarregamentoGlobal();
+
+            if (error) {
+                mostrarToast('Erro ao salvar doador: ' + error.message, 'error');
+            } else {
+                mostrarToast('Doador cadastrado com sucesso!', 'success');
+                document.getElementById('form-doador').reset();
+                carregarDoadores();
+            }
+        });
+
+        // SALVAR DOAÇÃO COMPLETA
+        document.getElementById('form-doacao').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const hasFin = document.getElementById('check-financeiro').checked;
+            const hasMat = document.getElementById('check-material').checked;
+
+            if (!hasFin && !hasMat) {
+                mostrarToast('Por favor, marque pelo menos uma opção (Financeira ou Material).', 'error');
+                return;
+            }
+
+            exibirCarregamentoGlobal();
+
+            const idDoadorVal = document.getElementById('doacao-id-doador').value;
+            if (!idDoadorVal || isNaN(parseInt(idDoadorVal))) {
+                ocultarCarregamentoGlobal();
+                mostrarToast('Por favor, pesquise e selecione um doador válido da lista.', 'error');
+                return;
+            }
+
+            const dadosDoacao = {
+                id_doador: parseInt(idDoadorVal),
+                canal_recebimento: document.getElementById('doacao-canal').value,
+                observacoes: document.getElementById('doacao-observacoes').value || null
+            };
+
+            // Inserção na tabela pai "doacoes"
+            const { data: doacaoCriada, error: errorPai } = await supabaseClient.from('doacoes').insert([dadosDoacao]).select();
+
+            if (errorPai) {
+                ocultarCarregamentoGlobal();
+                mostrarToast('Erro ao criar evento de doação: ' + errorPai.message, 'error');
+                return;
+            }
+
+            if (!doacaoCriada || doacaoCriada.length === 0) {
+                ocultarCarregamentoGlobal();
+                mostrarToast('Erro ao obter o ID da doação criada.', 'error');
+                return;
+            }
+
+            const idDoacaoGerado = doacaoCriada[0].id_doacao;
+
+            if (hasFin) {
+                const dadosFin = {
+                    id_doacao: idDoacaoGerado,
+                    valor: parseFloat(document.getElementById('fin-valor').value),
+                    comprovante_transacao: document.getElementById('fin-comprovante').value || null
+                };
+                const { error: errorFin } = await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                if (errorFin) mostrarToast('Erro ao salvar dados financeiros: ' + errorFin.message, 'error');
+            }
+
+            if (hasMat) {
+                const dadosMat = {
+                    id_doacao: idDoacaoGerado,
+                    id_categoria: parseInt(document.getElementById('mat-categoria').value),
+                    descricao_item: document.getElementById('mat-descricao').value,
+                    quantidade: parseInt(document.getElementById('mat-qtd').value),
+                    unidade_medida: document.getElementById('mat-unidade').value,
+                    estado_conservacao: document.getElementById('mat-estado').value,
+                    destino_item: document.getElementById('mat-destino').value
+                };
+                const { error: errorMat } = await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                if (errorMat) mostrarToast('Erro ao salvar materiais: ' + errorMat.message, 'error');
+            }
+
+            ocultarCarregamentoGlobal();
+            mostrarToast('Doação registrada com sucesso no Supabase!', 'success');
+            document.getElementById('form-doacao').reset();
+            limparSelecaoDoador('form');
+            document.getElementById('sub-financeiro').classList.add('hidden');
+            document.getElementById('sub-material').classList.add('hidden');
+            document.getElementById('check-financeiro').checked = false;
+            document.getElementById('check-material').checked = false;
+        });
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active', 'visible');
+            });
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn px-5 py-2.5 text-sm font-medium rounded-xl transition duration-150 focus:outline-none text-gray-500 hover:text-gray-900 hover:bg-gray-50 flex items-center gap-2 bg-transparent border border-transparent";
+            });
+
+            const activeTab = document.getElementById('tab-' + tabName);
+            activeTab.classList.add('active');
+            requestAnimationFrame(() => {
+                activeTab.classList.add('visible');
+            });
+
+            const activeBtn = document.getElementById('btn-' + tabName);
+            activeBtn.className = "tab-btn px-5 py-2.5 text-sm font-medium rounded-xl transition duration-150 focus:outline-none bg-rose-50 text-rose-600 shadow-sm border border-rose-100 flex items-center gap-2";
+
+            if (tabName === 'admin') {
+                carregarDadosAdmin();
+            } else if (tabName === 'estoque') {
+                carregarEstoque();
+            }
+        }
+
+        function toggleSubForm(id, checkbox) {
+            const element = document.getElementById(id);
+            if (checkbox.checked) {
+                element.classList.remove('hidden');
+                element.querySelectorAll('input, select').forEach(el => {
+                    if (el.id !== 'fin-comprovante' && el.id !== 'edit-fin-comprovante') {
+                        el.setAttribute('required', 'true');
+                    }
+                });
+            } else {
+                element.classList.add('hidden');
+                element.querySelectorAll('input, select').forEach(el => el.removeAttribute('required'));
+            }
+        }
+
+        // ==========================================
+        // PAINEL ADMINISTRATIVO E CASO DE USO CRUD
+        // ==========================================
+
+        let doadoresList = [];
+        let doacoesList = [];
+        let adminSubTabAtiva = 'doadores';
+
+        function switchAdminSubTab(subTabName) {
+            adminSubTabAtiva = subTabName;
+            document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'shadow-sm', 'text-gray-800');
+                btn.classList.add('text-gray-500', 'hover:text-gray-800');
+            });
+            const activeBtn = document.getElementById('btn-sub-' + subTabName);
+            activeBtn.classList.remove('text-gray-500', 'hover:text-gray-800');
+            activeBtn.classList.add('bg-white', 'shadow-sm', 'text-gray-800');
+
+            document.getElementById('container-tabela-doadores').classList.add('hidden');
+            document.getElementById('container-tabela-doacoes').classList.add('hidden');
+            document.getElementById('container-tabela-' + subTabName).classList.remove('hidden');
+
+            document.getElementById('admin-search').value = '';
+            filtrarTabelasAdmin();
+        }
+
+        async function carregarDadosAdmin() {
+            exibirCarregamentoGlobal();
+            await Promise.all([
+                carregarMetricas(),
+                listarDoadoresAdmin(),
+                listarDoacoesAdmin()
+            ]).finally(() => {
+                ocultarCarregamentoGlobal();
+            });
+        }
+
+        async function carregarMetricas() {
+            try {
+                // Total doadores
+                const { count: doadoresCount, error: errDoadores } = await supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
+                if (errDoadores) throw errDoadores;
+
+                // Total doações
+                const { count: doacoesCount, error: errDoacoes } = await supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
+                if (errDoacoes) throw errDoacoes;
+
+                // Soma financeiro
+                const { data: finData, error: errFin } = await supabaseClient.from('doacoes_financeiras').select('valor');
+                if (errFin) throw errFin;
+                const totalFinanceiro = finData ? finData.reduce((acc, r) => acc + parseFloat(r.valor || 0), 0) : 0;
+
+                // Soma materiais
+                const { data: matData, error: errMat } = await supabaseClient.from('doacoes_materiais').select('quantidade');
+                if (errMat) throw errMat;
+                const totalMateriais = matData ? matData.reduce((acc, r) => acc + parseInt(r.quantidade || 0), 0) : 0;
+
+                // Atualizar DOM
+                document.getElementById('metric-doadores').innerText = doadoresCount !== null ? doadoresCount : '0';
+                document.getElementById('metric-doacoes').innerText = doacoesCount !== null ? doacoesCount : '0';
+                document.getElementById('metric-financeiro').innerText = 'R$ ' + totalFinanceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                document.getElementById('metric-materiais').innerText = totalMateriais;
+            } catch (error) {
+                console.error("Erro ao carregar métricas:", error);
+            }
+        }
+
+        function formatarDataBR(dataIso) {
+            if (!dataIso) return '-';
+            const partes = dataIso.split('-');
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+            return dataIso;
+        }
+
+        async function listarDoadoresAdmin() {
+            exibirSkeletonTabela('tabela-doadores-body', 8);
+            try {
+                const { data, error } = await supabaseClient.from('doadores').select('*').order('nome');
+                if (error) throw error;
+                doadoresList = data || [];
+                renderizarDoadoresAdmin(doadoresList);
+            } catch (error) {
+                console.error("Erro ao carregar doadores (admin):", error);
+            }
+        }
+
+        function renderizarDoadoresAdmin(lista) {
+            const tbody = document.getElementById('tabela-doadores-body');
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">Nenhum doador cadastrado ou encontrado.</td></tr>`;
+                return;
+            }
+
+            lista.forEach(doador => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 border-b border-gray-200 transition duration-150";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-gray-900">${doador.nome}</td>
+                    <td class="px-6 py-4 text-xs font-semibold text-gray-500">${doador.tipo_doador === 'PF' ? 'Pessoa Física (PF)' : 'Pessoa Jurídica (PJ)'}</td>
+                    <td class="px-6 py-4 font-mono text-xs">${formatarDocumento(doador.documento || '', doador.tipo_doador) || '-'}</td>
+                    <td class="px-6 py-4 text-xs">${doador.cidade || '-'}</td>
+                    <td class="px-6 py-4 text-xs font-mono">${formatarDataBR(doador.data_nascimento)}</td>
+                    <td class="px-6 py-4 text-xs">${formatarTelefone(doador.telefone || '') || '-'}</td>
+                    <td class="px-6 py-4 text-xs">${doador.email || '-'}</td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="abrirEditarDoador(${doador.id_doador})" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Doador">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deletarDoador(${doador.id_doador}, '${doador.nome}')" class="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Excluir Doador">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        async function listarDoacoesAdmin() {
+            exibirSkeletonTabela('tabela-doacoes-body', 7);
+            try {
+                const { data, error } = await supabaseClient
+                    .from('doacoes')
+                    .select('*, doadores(nome), doacoes_financeiras(*), doacoes_materiais(*)')
+                    .order('data_doacao', { ascending: false });
+                if (error) throw error;
+
+                // Normalizar canais antigos para "Dinheiro"
+                doacoesList = (data || []).map(d => {
+                    if (d.canal_recebimento === 'Conta Bancária' || d.canal_recebimento === 'Cofrinho' || d.canal_recebimento === 'Bazar') {
+                        d.canal_recebimento = 'Dinheiro';
+                    }
+                    return d;
+                });
+
+                renderizarDoacoesAdmin(doacoesList);
+            } catch (error) {
+                console.error("Erro ao carregar doações (admin):", error);
+            }
+        }
+
+        function renderizarDoacoesAdmin(lista) {
+            const tbody = document.getElementById('tabela-doacoes-body');
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">Nenhuma doação registrada ou encontrada.</td></tr>`;
+                return;
+            }
+
+            lista.forEach(doacao => {
+                const nomeDoador = doacao.doadores ? doacao.doadores.nome : 'Doador Desconhecido';
+
+                let tipoHTML = [];
+                let detalhesHTML = [];
+
+                if (doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0) {
+                    tipoHTML.push('<span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded font-medium">Financeira</span>');
+                    const fin = doacao.doacoes_financeiras[0];
+                    tipoHTML.push(`<span class="text-xs text-gray-500 font-mono">(${fin.comprovante_transacao || 'Sem comprovante'})</span>`);
+                    detalhesHTML.push(`<strong>R$ ${parseFloat(fin.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>`);
+                }
+
+                if (doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0) {
+                    tipoHTML.push('<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-medium">Material</span>');
+                    const mat = doacao.doacoes_materiais[0];
+                    detalhesHTML.push(`Item: ${mat.descricao_item} (${mat.quantidade} ${mat.unidade_medida})`);
+                    detalhesHTML.push(`<span class="text-xs block text-gray-500">Destino: ${mat.destino_item} | Estado: ${mat.estado_conservacao}</span>`);
+                }
+
+                const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 border-b border-gray-200 transition duration-150";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-gray-900">${nomeDoador}</td>
+                    <td class="px-6 py-4 text-xs">${doacao.canal_recebimento}</td>
+                    <td class="px-6 py-4"><div class="flex flex-wrap items-center gap-1">${tipoHTML.join(' ')}</div></td>
+                    <td class="px-6 py-4 text-xs leading-relaxed">${detalhesHTML.join('<br>')}</td>
+                    <td class="px-6 py-4 max-w-[150px] truncate text-xs" title="${doacao.observacoes || ''}">${doacao.observacoes || '-'}</td>
+                    <td class="px-6 py-4 text-xs whitespace-nowrap">${dataFmt}</td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="abrirEditarDoacao(${doacao.id_doacao})" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Doação">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deletarDoacao(${doacao.id_doacao})" class="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Excluir Doação">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function filtrarTabelasAdmin() {
+            const query = document.getElementById('admin-search').value.toLowerCase().trim();
+            if (adminSubTabAtiva === 'doadores') {
+                const filtrados = doadoresList.filter(doador =>
+                    doador.nome.toLowerCase().includes(query) ||
+                    (doador.documento && doador.documento.includes(query)) ||
+                    (doador.email && doador.email.toLowerCase().includes(query)) ||
+                    (doador.telefone && doador.telefone.includes(query)) ||
+                    (doador.cidade && doador.cidade.toLowerCase().includes(query)) ||
+                    (doador.data_nascimento && doador.data_nascimento.includes(query))
+                );
+                renderizarDoadoresAdmin(filtrados);
+            } else {
+                const filtrados = doacoesList.filter(doacao => {
+                    const nomeDoador = doacao.doadores ? doacao.doadores.nome.toLowerCase() : '';
+                    const canal = doacao.canal_recebimento.toLowerCase();
+                    const obs = doacao.observacoes ? doacao.observacoes.toLowerCase() : '';
+
+                    let detMatch = false;
+                    if (doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0) {
+                        detMatch = detMatch || String(doacao.doacoes_financeiras[0].valor).includes(query) ||
+                            (doacao.doacoes_financeiras[0].comprovante_transacao && doacao.doacoes_financeiras[0].comprovante_transacao.toLowerCase().includes(query));
+                    }
+                    if (doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0) {
+                        detMatch = detMatch || doacao.doacoes_materiais[0].descricao_item.toLowerCase().includes(query) ||
+                            doacao.doacoes_materiais[0].destino_item.toLowerCase().includes(query);
+                    }
+
+                    return nomeDoador.includes(query) || canal.includes(query) || obs.includes(query) || detMatch;
+                });
+                renderizarDoacoesAdmin(filtrados);
+            }
+        }
+
+        // ==========================================
+        // OPERAÇÕES DOADOR (EXCLUIR / EDITAR)
+        // ==========================================
+
+        async function deletarDoador(idDoador, nome) {
+            if (!confirm(`ATENÇÃO: Ao excluir o doador "${nome}", TODAS as doações vinculadas a ele (financeiras e materiais) serão excluídas permanentemente! Deseja continuar?`)) {
+                return;
+            }
+
+            exibirCarregamentoGlobal();
+            try {
+                // 1. Buscar doações do doador
+                const { data: listDoacoes, error: errList } = await supabaseClient.from('doacoes').select('id_doacao').eq('id_doador', idDoador);
+                if (errList) throw errList;
+
+                if (listDoacoes && listDoacoes.length > 0) {
+                    const idsDoacoes = listDoacoes.map(d => d.id_doacao);
+
+                    // 2. Excluir dados das doações financeiras vinculadas
+                    const { error: errFin } = await supabaseClient.from('doacoes_financeiras').delete().in('id_doacao', idsDoacoes);
+                    if (errFin) throw errFin;
+
+                    // 3. Excluir dados das doações materiais vinculadas
+                    const { error: errMat } = await supabaseClient.from('doacoes_materiais').delete().in('id_doacao', idsDoacoes);
+                    if (errMat) throw errMat;
+
+                    // 4. Excluir as doações vinculadas na tabela pai
+                    const { error: errDoacoes } = await supabaseClient.from('doacoes').delete().in('id_doacao', idsDoacoes);
+                    if (errDoacoes) throw errDoacoes;
+                }
+
+                // 5. Excluir o doador
+                const { error: errDoador } = await supabaseClient.from('doadores').delete().eq('id_doador', idDoador);
+                if (errDoador) throw errDoador;
+
+                mostrarToast('Doador e todas as doações associadas foram deletados com sucesso!', 'success');
+                carregarDadosAdmin();
+                carregarDoadores();
+                carregarEstoque();
+            } catch (error) {
+                mostrarToast('Erro ao excluir doador: ' + error.message, 'error');
+                console.error(error);
+            } finally {
+                ocultarCarregamentoGlobal();
+            }
+        }
+
+        function abrirEditarDoador(idDoador) {
+            const doador = doadoresList.find(d => d.id_doador === idDoador);
+            if (!doador) return;
+
+            document.getElementById('edit-doador-id').value = doador.id_doador;
+            document.getElementById('edit-doador-nome').value = doador.nome;
+            selecionarTipoDoadorEdit(doador.tipo_doador);
+
+            const inputDocEdit = document.getElementById('edit-doador-documento');
+            inputDocEdit.value = formatarDocumento(doador.documento || '', doador.tipo_doador);
+            document.getElementById('edit-doador-telefone').value = formatarTelefone(doador.telefone || '');
+            document.getElementById('edit-doador-email').value = doador.email || '';
+            document.getElementById('edit-doador-cidade').value = doador.cidade || '';
+            document.getElementById('edit-doador-data-nascimento').value = doador.data_nascimento || '';
+
+            mostrarModal('modal-editar-doador');
+        }
+
+        function fecharModalEditarDoador() {
+            fecharModal('modal-editar-doador');
+            document.getElementById('form-editar-doador').reset();
+        }
+
+        document.getElementById('form-editar-doador').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            exibirCarregamentoGlobal();
+            const idDoador = parseInt(document.getElementById('edit-doador-id').value);
+
+            const doadorAtualizado = {
+                nome: document.getElementById('edit-doador-nome').value,
+                tipo_doador: document.getElementById('edit-doador-tipo').value,
+                documento: document.getElementById('edit-doador-documento').value || null,
+                telefone: document.getElementById('edit-doador-telefone').value || null,
+                email: document.getElementById('edit-doador-email').value || null,
+                cidade: document.getElementById('edit-doador-cidade').value || null,
+                data_nascimento: document.getElementById('edit-doador-data-nascimento').value || null
+            };
+
+            const { error } = await supabaseClient.from('doadores').update(doadorAtualizado).eq('id_doador', idDoador);
+            ocultarCarregamentoGlobal();
+
+            if (error) {
+                mostrarToast('Erro ao atualizar doador: ' + error.message, 'error');
+            } else {
+                mostrarToast('Doador atualizado com sucesso!', 'success');
+                fecharModalEditarDoador();
+                carregarDadosAdmin();
+                carregarDoadores();
+            }
+        });
+
+        // ==========================================
+        // OPERAÇÕES DOAÇÃO (EXCLUIR / EDITAR)
+        // ==========================================
+
+        async function deletarDoacao(idDoacao) {
+            if (!confirm('Deseja realmente excluir esta doação permanentemente?')) {
+                return;
+            }
+
+            exibirCarregamentoGlobal();
+            try {
+                // 1. Excluir financeiras
+                const { error: errFin } = await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+                if (errFin) throw errFin;
+
+                // 2. Excluir materiais
+                const { error: errMat } = await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+                if (errMat) throw errMat;
+
+                // 3. Excluir doação pai
+                const { error: errDoacao } = await supabaseClient.from('doacoes').delete().eq('id_doacao', idDoacao);
+                if (errDoacao) throw errDoacao;
+
+                mostrarToast('Doação excluída com sucesso!', 'success');
+                carregarDadosAdmin();
+                carregarEstoque();
+            } catch (error) {
+                mostrarToast('Erro ao excluir doação: ' + error.message, 'error');
+                console.error(error);
+            } finally {
+                ocultarCarregamentoGlobal();
+            }
+        }
+
+        function abrirEditarDoacao(idDoacao) {
+            const doacao = doacoesList.find(d => d.id_doacao === idDoacao);
+            if (!doacao) return;
+
+            // Preencher doador selecionado no componente de busca
+            const nomeDoador = doacao.doadores ? doacao.doadores.nome : '';
+            if (doacao.id_doador && nomeDoador) {
+                selecionarDoador('edit', doacao.id_doador, nomeDoador);
+            } else {
+                limparSelecaoDoador('edit');
+            }
+
+            // Preencher categorias de itens dinamicamente
+            const selectCat = document.getElementById('edit-mat-categoria');
+            const originalCatSelect = document.getElementById('mat-categoria');
+            selectCat.innerHTML = originalCatSelect.innerHTML;
+
+            // Preencher campos gerais
+            document.getElementById('edit-doacao-id').value = doacao.id_doacao;
+            document.getElementById('edit-doacao-canal').value = doacao.canal_recebimento;
+            document.getElementById('edit-doacao-observacoes').value = doacao.observacoes || '';
+
+            // Sub-formulário financeiro
+            const hasFin = doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0;
+            document.getElementById('edit-check-financeiro').checked = hasFin;
+            const subFin = document.getElementById('edit-sub-financeiro');
+            if (hasFin) {
+                subFin.classList.remove('hidden');
+                document.getElementById('edit-fin-valor').value = doacao.doacoes_financeiras[0].valor;
+                document.getElementById('edit-fin-comprovante').value = doacao.doacoes_financeiras[0].comprovante_transacao || '';
+                subFin.querySelectorAll('input, select').forEach(el => {
+                    if (el.id !== 'edit-fin-comprovante') {
+                        el.setAttribute('required', 'true');
+                    }
+                });
+            } else {
+                subFin.classList.add('hidden');
+                document.getElementById('edit-fin-valor').value = '';
+                document.getElementById('edit-fin-comprovante').value = '';
+                subFin.querySelectorAll('input, select').forEach(el => el.removeAttribute('required'));
+            }
+
+            // Sub-formulário material
+            const hasMat = doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0;
+            document.getElementById('edit-check-material').checked = hasMat;
+            const subMat = document.getElementById('edit-sub-material');
+            if (hasMat) {
+                subMat.classList.remove('hidden');
+                const mat = doacao.doacoes_materiais[0];
+                document.getElementById('edit-mat-descricao').value = mat.descricao_item;
+                selectCat.value = mat.id_categoria;
+                document.getElementById('edit-mat-qtd').value = mat.quantidade;
+                document.getElementById('edit-mat-unidade').value = mat.unidade_medida;
+                document.getElementById('edit-mat-estado').value = mat.estado_conservacao;
+                document.getElementById('edit-mat-destino').value = mat.destino_item;
+                subMat.querySelectorAll('input, select').forEach(el => el.setAttribute('required', 'true'));
+            } else {
+                subMat.classList.add('hidden');
+                document.getElementById('edit-mat-descricao').value = '';
+                selectCat.value = '';
+                document.getElementById('edit-mat-qtd').value = '1';
+                document.getElementById('edit-mat-unidade').value = 'Unidade';
+                document.getElementById('edit-mat-estado').value = 'Não se aplica';
+                document.getElementById('edit-mat-destino').value = 'Estoque Geral';
+                subMat.querySelectorAll('input, select').forEach(el => el.removeAttribute('required'));
+            }
+
+            mostrarModal('modal-editar-doacao');
+        }
+
+        function fecharModalEditarDoacao() {
+            fecharModal('modal-editar-doacao');
+            document.getElementById('form-editar-doacao').reset();
+        }
+
+        document.getElementById('form-editar-doacao').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const idDoacao = parseInt(document.getElementById('edit-doacao-id').value);
+
+            const editHasFin = document.getElementById('edit-check-financeiro').checked;
+            const editHasMat = document.getElementById('edit-check-material').checked;
+
+            if (!editHasFin && !editHasMat) {
+                mostrarToast('Por favor, marque pelo menos uma opção (Financeira ou Material).', 'error');
+                return;
+            }
+
+            exibirCarregamentoGlobal();
+
+            const dadosDoacao = {
+                id_doador: parseInt(document.getElementById('edit-doacao-id-doador').value),
+                canal_recebimento: document.getElementById('edit-doacao-canal').value,
+                observacoes: document.getElementById('edit-doacao-observacoes').value || null
+            };
+
+            const { error: errorPai } = await supabaseClient.from('doacoes').update(dadosDoacao).eq('id_doacao', idDoacao);
+            if (errorPai) {
+                ocultarCarregamentoGlobal();
+                mostrarToast('Erro ao atualizar dados principais da doação: ' + errorPai.message, 'error');
+                return;
+            }
+
+            // Salvar financeiro
+            if (editHasFin) {
+                const dadosFin = {
+                    id_doacao: idDoacao,
+                    valor: parseFloat(document.getElementById('edit-fin-valor').value),
+                    comprovante_transacao: document.getElementById('edit-fin-comprovante').value || null
+                };
+
+                const originalDoacao = doacoesList.find(d => d.id_doacao === idDoacao);
+                const originallyHadFin = originalDoacao && originalDoacao.doacoes_financeiras && originalDoacao.doacoes_financeiras.length > 0;
+
+                if (originallyHadFin) {
+                    const { error: errorFin } = await supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
+                    if (errorFin) mostrarToast('Erro ao atualizar dados financeiros: ' + errorFin.message, 'error');
+                } else {
+                    const { error: errorFin } = await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                    if (errorFin) mostrarToast('Erro ao registrar dados financeiros: ' + errorFin.message, 'error');
+                }
+            } else {
+                const { error: errorFin } = await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+                if (errorFin) console.log('Removido dados financeiros se existiam.');
+            }
+
+            // Salvar material
+            if (editHasMat) {
+                const dadosMat = {
+                    id_doacao: idDoacao,
+                    id_categoria: parseInt(document.getElementById('edit-mat-categoria').value),
+                    descricao_item: document.getElementById('edit-mat-descricao').value,
+                    quantidade: parseInt(document.getElementById('edit-mat-qtd').value),
+                    unidade_medida: document.getElementById('edit-mat-unidade').value,
+                    estado_conservacao: document.getElementById('edit-mat-estado').value,
+                    destino_item: document.getElementById('edit-mat-destino').value
+                };
+
+                const originalDoacao = doacoesList.find(d => d.id_doacao === idDoacao);
+                const originallyHadMat = originalDoacao && originalDoacao.doacoes_materiais && originalDoacao.doacoes_materiais.length > 0;
+
+                if (originallyHadMat) {
+                    const { error: errorMat } = await supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
+                    if (errorMat) mostrarToast('Erro ao atualizar dados materiais: ' + errorMat.message, 'error');
+                } else {
+                    const { error: errorMat } = await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                    if (errorMat) mostrarToast('Erro ao registrar dados materiais: ' + errorMat.message, 'error');
+                }
+            } else {
+                const { error: errorMat } = await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+                if (errorMat) console.log('Removido dados materiais se existiam.');
+            }
+
+            ocultarCarregamentoGlobal();
+            mostrarToast('Doação atualizada com sucesso!', 'success');
+            fecharModalEditarDoacao();
+            carregarDadosAdmin();
+            carregarEstoque();
+        });
+
+        function toggleSubForm(id, checkbox) {
+            const element = document.getElementById(id);
+            if (checkbox.checked) {
+                element.classList.remove('hidden');
+                element.querySelectorAll('input, select').forEach(el => {
+                    if (el.id !== 'fin-comprovante' && el.id !== 'edit-fin-comprovante') {
+                        el.setAttribute('required', 'true');
+                    }
+                });
+            } else {
+                element.classList.add('hidden');
+                element.querySelectorAll('input, select').forEach(el => el.removeAttribute('required'));
+            }
+        }
+
+        // ==========================================
+        // SELEÇÃO DE PRESET DE CONTEÚDO DE DOAÇÃO
+        // ==========================================
+        function selecionarPresetConteudo(tipo, contexto = 'form') {
+            const isEdit = contexto === 'edit';
+            const descEl = document.getElementById(isEdit ? 'edit-mat-descricao' : 'mat-descricao');
+            const catEl = document.getElementById(isEdit ? 'edit-mat-categoria' : 'mat-categoria');
+            const qtdEl = document.getElementById(isEdit ? 'edit-mat-qtd' : 'mat-qtd');
+            const unEl = document.getElementById(isEdit ? 'edit-mat-unidade' : 'mat-unidade');
+            const estEl = document.getElementById(isEdit ? 'edit-mat-estado' : 'mat-estado');
+            const destEl = document.getElementById(isEdit ? 'edit-mat-destino' : 'mat-destino');
+
+            const presets = {
+                'bazar': { catId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
+                'alimentos': { catId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
+                'higiene': { catId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+                'cabelo': { catId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+                'ortopedicos': { catId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
+            };
+
+            const p = presets[tipo];
+            if (!p) return;
+
+            if (catEl) catEl.value = p.catId;
+            if (destEl) destEl.value = p.destino;
+            if (unEl) unEl.value = p.unidade;
+            if (estEl) estEl.value = p.estado;
+            if (descEl) descEl.value = p.desc;
+            if (qtdEl && (!qtdEl.value || parseInt(qtdEl.value) <= 0)) qtdEl.value = 1;
+
+            document.querySelectorAll(`.preset-btn-${contexto}`).forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-rose-500', 'bg-white', 'shadow-md');
+            });
+            const activeBtn = document.getElementById(`preset-${contexto}-${tipo}`);
+            if (activeBtn) {
+                activeBtn.classList.add('ring-2', 'ring-rose-500', 'bg-white', 'shadow-md');
+            }
+        }
+
+        // ==========================================
+        // CONTROLE DE ESTOQUE (OS INVENTORY)
+        // ==========================================
+
+        let estoqueList = [];
+        let estoqueDoacoesList = [];
+        let estoqueSubTabAtiva = 'Bazar'; // Default active sub-tab (Destaque para Bazar)
+        let modoVisaoEstoque = 'consolidado'; // 'consolidado' ou 'lotes'
+
+        function alterarModoVisaoEstoque(modo) {
+            modoVisaoEstoque = modo;
+            const btnConsolidado = document.getElementById('btn-visao-consolidado');
+            const btnLotes = document.getElementById('btn-visao-lotes');
+
+            if (modo === 'consolidado') {
+                if (btnConsolidado) btnConsolidado.className = "px-3 py-1.5 rounded-lg bg-rose-600 text-white font-semibold transition cursor-pointer shadow-xs";
+                if (btnLotes) btnLotes.className = "px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer";
+            } else {
+                if (btnLotes) btnLotes.className = "px-3 py-1.5 rounded-lg bg-rose-600 text-white font-semibold transition cursor-pointer shadow-xs";
+                if (btnConsolidado) btnConsolidado.className = "px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer";
+            }
+
+            renderizarAbaEstoqueAtual();
+        }
+
+        function switchEstoqueSubTab(tabName) {
+            estoqueSubTabAtiva = tabName;
+
+            // Highlight active button and reset others
+            document.querySelectorAll('.estoque-sub-btn').forEach(btn => {
+                btn.classList.remove(
+                    'bg-rose-600', 'text-white', 'border-rose-600',
+                    'bg-emerald-50', 'text-emerald-700', 'border-emerald-200',
+                    'bg-rose-50', 'text-rose-700', 'border-rose-200',
+                    'shadow-sm', 'font-semibold', 'font-bold'
+                );
+                btn.classList.add('bg-white', 'text-gray-600', 'border-gray-200', 'hover:bg-gray-50');
+            });
+
+            const activeBtn = document.getElementById('btn-est-' + tabName);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-white', 'text-gray-600', 'border-gray-200', 'hover:bg-gray-50');
+                if (tabName === 'Bazar') {
+                    activeBtn.classList.add('bg-rose-600', 'text-white', 'border-rose-600', 'shadow-sm', 'font-bold');
+                } else {
+                    const canais = ['Presencial', 'PIX', 'Dinheiro'];
+                    if (canais.includes(tabName)) {
+                        activeBtn.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200', 'shadow-sm', 'font-semibold');
+                    } else {
+                        activeBtn.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'shadow-sm', 'font-semibold');
+                    }
+                }
+            }
+
+            // Atualizar Banner Informativo
+            const banner = document.getElementById('banner-estoque-materiais');
+            const canais = ['Presencial', 'PIX', 'Dinheiro'];
+            if (canais.includes(tabName)) {
+                if (banner) banner.classList.add('hidden');
+            } else {
+                if (banner) banner.classList.remove('hidden');
+                const tituloBanner = document.getElementById('banner-titulo-subtab');
+                const subTituloBanner = document.getElementById('banner-subtitulo-subtab');
+                const iconContainer = document.getElementById('banner-icon-container');
+
+                const descricoesBanners = {
+                    'Bazar': {
+                        titulo: 'Resumo Consolidado do Estoque: Bazar',
+                        sub: 'Exibição exclusiva e quantitativo acumulado de todos os itens doados para o Bazar.',
+                        icon: 'shopping-bag',
+                        color: 'bg-rose-100 text-rose-700'
+                    },
+                    'Alimentos': {
+                        titulo: 'Resumo Consolidado do Estoque: Alimentos / Cestas',
+                        sub: 'Quantitativo acumulado de alimentos e cestas básicas em estoque.',
+                        icon: 'apple',
+                        color: 'bg-amber-100 text-amber-700'
+                    },
+                    'Higiene': {
+                        titulo: 'Resumo Consolidado do Estoque: Produtos de Higiene',
+                        sub: 'Quantitativo acumulado de produtos de higiene pessoal.',
+                        icon: 'droplet',
+                        color: 'bg-sky-100 text-sky-700'
+                    },
+                    'Cabelo': {
+                        titulo: 'Resumo Consolidado do Estoque: Cabelo (Perucas)',
+                        sub: 'Quantitativo acumulado de perucas e mechas de cabelo.',
+                        icon: 'sparkles',
+                        color: 'bg-purple-100 text-purple-700'
+                    },
+                    'Ortopedicos': {
+                        titulo: 'Resumo Consolidado do Estoque: Equipamentos Ortopédicos',
+                        sub: 'Equipamentos ortopédicos disponíveis para pacientes.',
+                        icon: 'accessibility',
+                        color: 'bg-emerald-100 text-emerald-700'
+                    }
+                };
+
+                const info = descricoesBanners[tabName] || descricoesBanners['Bazar'];
+                if (tituloBanner) tituloBanner.innerText = info.titulo;
+                if (subTituloBanner) subTituloBanner.innerText = info.sub;
+                if (iconContainer) {
+                    iconContainer.className = `p-3 rounded-xl ${info.color}`;
+                    iconContainer.innerHTML = `<i data-lucide="${info.icon}" class="w-5 h-5"></i>`;
+                }
+            }
+
+            // Clear search field when switching sub-tabs
+            const searchInput = document.getElementById('stock-search');
+            if (searchInput) searchInput.value = '';
+
+            renderizarAbaEstoqueAtual();
+        }
+
+        async function carregarEstoque() {
+            exibirCarregamentoGlobal();
+            exibirSkeletonTabela('tabela-estoque-canais-body', 6);
+            exibirSkeletonTabela('tabela-estoque-materiais-body', 7);
+            try {
+                // Fetch materials for stock categories
+                const { data: matData, error: matError } = await supabaseClient
+                    .from('doacoes_materiais')
+                    .select('*, categorias_itens(nome_categoria), doacoes(data_doacao, canal_recebimento, observacoes)')
+                    .order('id_material', { ascending: false });
+
+                if (matError) throw matError;
+                estoqueList = (matData || []).map(m => {
+                    if (m.doacoes && (m.doacoes.canal_recebimento === 'Conta Bancária' || m.doacoes.canal_recebimento === 'Cofrinho' || m.doacoes.canal_recebimento === 'Bazar')) {
+                        m.doacoes.canal_recebimento = 'Dinheiro';
+                    }
+                    return m;
+                });
+
+                // Fetch all donations (financial and physical) for channels, ordered by date desc
+                const { data: doaData, error: doaError } = await supabaseClient
+                    .from('doacoes')
+                    .select('*, doacoes_financeiras(*), doacoes_materiais(*, categorias_itens(nome_categoria))')
+                    .order('data_doacao', { ascending: false });
+
+                if (doaError) throw doaError;
+                estoqueDoacoesList = (doaData || []).map(d => {
+                    if (d.canal_recebimento === 'Conta Bancária' || d.canal_recebimento === 'Cofrinho' || d.canal_recebimento === 'Bazar') {
+                        d.canal_recebimento = 'Dinheiro';
+                    }
+                    return d;
+                });
+
+                // Calculate stock metrics (Bazar, Alimentos, Higiene, Total)
+                const totalBazar = estoqueList
+                    .filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6)
+                    .reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
+
+                const totalAlimentos = estoqueList
+                    .filter(m => m.id_categoria === 2)
+                    .reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
+
+                const totalHigiene = estoqueList
+                    .filter(m => m.id_categoria === 3)
+                    .reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
+
+                const totalItens = estoqueList.reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
+
+                const metricBazar = document.getElementById('stock-metric-bazar');
+                const metricAlimentos = document.getElementById('stock-metric-alimentos');
+                const metricHigiene = document.getElementById('stock-metric-higiene');
+                const metricTotal = document.getElementById('stock-metric-total');
+
+                if (metricBazar) metricBazar.innerHTML = `${totalBazar} <span class="text-xs font-medium text-slate-400">un.</span>`;
+                if (metricAlimentos) metricAlimentos.innerHTML = `${totalAlimentos} <span class="text-xs font-medium text-slate-400">un.</span>`;
+                if (metricHigiene) metricHigiene.innerHTML = `${totalHigiene} <span class="text-xs font-medium text-slate-400">un.</span>`;
+                if (metricTotal) metricTotal.innerHTML = `${totalItens} <span class="text-xs font-medium text-slate-400">itens</span>`;
+
+                // Trigger subtab rendering
+                switchEstoqueSubTab(estoqueSubTabAtiva);
+            } catch (error) {
+                console.error("Erro ao carregar estoque:", error);
+            } finally {
+                ocultarCarregamentoGlobal();
+            }
+        }
+
+        function renderizarAbaEstoqueAtual() {
+            const canais = ['Presencial', 'PIX', 'Dinheiro'];
+            const query = document.getElementById('stock-search')?.value.toLowerCase().trim() || '';
+
+            if (canais.includes(estoqueSubTabAtiva)) {
+                // Show channel table, hide materials table
+                document.getElementById('container-estoque-canais')?.classList.remove('hidden');
+                document.getElementById('container-estoque-materiais')?.classList.add('hidden');
+
+                // Filter donations by channel
+                let filtered = estoqueDoacoesList.filter(d => d.canal_recebimento === estoqueSubTabAtiva);
+
+                // Apply search filter if query is present
+                if (query) {
+                    filtered = filtered.filter(d => {
+                        const obs = d.observacoes ? d.observacoes.toLowerCase() : '';
+                        let hasMatMatch = false;
+                        let hasFinMatch = false;
+
+                        if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) {
+                            const fin = d.doacoes_financeiras[0];
+                            hasFinMatch = String(fin.valor).includes(query) || (fin.comprovante_transacao && fin.comprovante_transacao.toLowerCase().includes(query));
+                        }
+                        if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {
+                            const mat = d.doacoes_materiais[0];
+                            const catName = mat.categorias_itens ? mat.categorias_itens.nome_categoria.toLowerCase() : '';
+                            hasMatMatch = mat.descricao_item.toLowerCase().includes(query) || catName.includes(query) || mat.destino_item.toLowerCase().includes(query) || mat.estado_conservacao.toLowerCase().includes(query);
+                        }
+
+                        return obs.includes(query) || hasFinMatch || hasMatMatch;
+                    });
+                }
+
+                renderizarEstoqueCanal(filtered);
+            } else {
+                // Show materials table, hide channel table
+                document.getElementById('container-estoque-canais')?.classList.add('hidden');
+                document.getElementById('container-estoque-materiais')?.classList.remove('hidden');
+
+                let filtered = [];
+                if (estoqueSubTabAtiva === 'Bazar') {
+                    // Dedicated Bazar filter: destino === 'Bazar' OU categoria 6 (Vestuário/Bazar)
+                    filtered = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6);
+                } else {
+                    const mapCat = {
+                        'Alimentos': 2,
+                        'Higiene': 3,
+                        'Cabelo': 4,
+                        'Ortopedicos': 5
+                    };
+                    const catId = mapCat[estoqueSubTabAtiva];
+                    filtered = estoqueList.filter(m => m.id_categoria === catId);
+                }
+
+                // Apply search filter if query is present
+                if (query) {
+                    filtered = filtered.filter(m => {
+                        const desc = m.descricao_item.toLowerCase();
+                        const destino = m.destino_item.toLowerCase();
+                        const estado = m.estado_conservacao.toLowerCase();
+                        const unidade = m.unidade_medida.toLowerCase();
+                        return desc.includes(query) || destino.includes(query) || estado.includes(query) || unidade.includes(query);
+                    });
+                }
+
+                renderizarEstoqueCategoria(filtered);
+            }
+        }
+
+        function renderizarEstoqueCanal(lista) {
+            const tbody = document.getElementById('tabela-estoque-canais-body');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Nenhuma doação registrada para este canal.</td></tr>`;
+                return;
+            }
+
+            lista.forEach(doacao => {
+                let tipoHTML = [];
+                let detalhesHTML = [];
+                let estadoDestinoHTML = [];
+
+                if (doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0) {
+                    tipoHTML.push('<span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded font-medium block mb-1 text-center">Financeira</span>');
+                    const fin = doacao.doacoes_financeiras[0];
+                    detalhesHTML.push(`<strong>R$ ${parseFloat(fin.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>`);
+                    if (fin.comprovante_transacao) {
+                        detalhesHTML.push(`<span class="text-xs text-gray-500 font-mono block">ID: ${fin.comprovante_transacao}</span>`);
+                    }
+                }
+
+                if (doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0) {
+                    tipoHTML.push('<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-medium block text-center">Material</span>');
+                    const mat = doacao.doacoes_materiais[0];
+                    const catName = mat.categorias_itens ? mat.categorias_itens.nome_categoria : 'Sem Categoria';
+                    detalhesHTML.push(`<span class="font-medium">${mat.descricao_item}</span> <span class="text-xs text-gray-500">(${catName} - ${mat.quantidade} ${mat.unidade_medida})</span>`);
+                    estadoDestinoHTML.push(`<span class="text-xs block"><strong>Destino:</strong> ${mat.destino_item}</span>`);
+                    estadoDestinoHTML.push(`<span class="text-xs block"><strong>Estado:</strong> ${mat.estado_conservacao}</span>`);
+                }
+
+                const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 border-b border-gray-200 transition duration-150";
+                tr.innerHTML = `
+                    <td class="px-6 py-4 text-xs whitespace-nowrap font-medium text-gray-900">${dataFmt}</td>
+                    <td class="px-6 py-4 text-center">${tipoHTML.join('')}</td>
+                    <td class="px-6 py-4 text-xs leading-relaxed">${detalhesHTML.join('')}</td>
+                    <td class="px-6 py-4 text-xs">${estadoDestinoHTML.join('') || '-'}</td>
+                    <td class="px-6 py-4 max-w-[150px] truncate text-xs" title="${doacao.observacoes || ''}">${doacao.observacoes || '-'}</td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="abrirEditarDoacao(${doacao.id_doacao})" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Doação">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deletarDoacao(${doacao.id_doacao})" class="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Excluir Doação">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function renderizarEstoqueCategoria(lista) {
+            const tbody = document.getElementById('tabela-estoque-materiais-body');
+            const thead = document.getElementById('tabela-estoque-materiais-head');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">Nenhum item registrado para esta categoria/destino.</td></tr>`;
+                return;
+            }
+
+            if (modoVisaoEstoque === 'consolidado') {
+                // Atualizar cabeçalho para visão consolidada
+                if (thead) {
+                    thead.innerHTML = `
+                        <tr>
+                            <th class="px-6 py-3.5 font-bold">Item / Descrição Consolidada</th>
+                            <th class="px-6 py-3.5 font-bold text-center">Quantidade Total Acumulada</th>
+                            <th class="px-6 py-3.5 font-bold">Unidade</th>
+                            <th class="px-6 py-3.5 font-bold">Destino Atual</th>
+                            <th class="px-6 py-3.5 font-bold">Registros de Doação</th>
+                            <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                        </tr>
+                    `;
+                }
+
+                // Agrupar itens por descrição normalizada e unidade
+                const grupos = {};
+                lista.forEach(item => {
+                    const key = item.descricao_item.trim().toLowerCase() + '_' + item.unidade_medida;
+                    if (!grupos[key]) {
+                        grupos[key] = {
+                            descricao: item.descricao_item,
+                            quantidadeTotal: 0,
+                            unidade: item.unidade_medida,
+                            destino: item.destino_item,
+                            lotes: []
+                        };
+                    }
+                    grupos[key].quantidadeTotal += parseInt(item.quantidade || 0);
+                    grupos[key].lotes.push(item);
+                });
+
+                Object.values(grupos).forEach(grupo => {
+                    const primeiroItem = grupo.lotes[0];
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-rose-50/40 border-b border-gray-200 transition duration-150";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-bold text-slate-800 text-xs flex items-center gap-2">
+                            <i data-lucide="package-check" class="w-4 h-4 text-rose-600"></i>
+                            ${grupo.descricao}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="bg-rose-100 text-rose-800 font-extrabold text-sm px-3 py-1 rounded-full shadow-xs">
+                                ${grupo.quantidadeTotal}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-xs font-medium text-slate-700">${grupo.unidade}</td>
+                        <td class="px-6 py-4 text-xs">
+                            <span class="bg-slate-100 text-slate-800 text-xs px-2.5 py-1 rounded-lg font-medium">${grupo.destino}</span>
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-500 font-medium">
+                            ${grupo.lotes.length} lote(s) doado(s)
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <button onclick="abrirEditarEstoque(${primeiroItem.id_material})" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition inline-flex items-center justify-center w-8 h-8" title="Editar Item no Estoque">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } else {
+                // Atualizar cabeçalho para visão de lotes individuais
+                if (thead) {
+                    thead.innerHTML = `
+                        <tr>
+                            <th class="px-6 py-3.5 font-bold">Descrição do Item</th>
+                            <th class="px-6 py-3.5 font-bold text-center">Quantidade</th>
+                            <th class="px-6 py-3.5 font-bold">Unidade</th>
+                            <th class="px-6 py-3.5 font-bold">Estado de Conservação</th>
+                            <th class="px-6 py-3.5 font-bold">Destino Atual</th>
+                            <th class="px-6 py-3.5 font-bold">Data de Entrada</th>
+                            <th class="px-6 py-3.5 font-bold text-center">Ações</th>
+                        </tr>
+                    `;
+                }
+
+                lista.forEach(item => {
+                    const dataEntrada = item.doacoes && item.doacoes.data_doacao
+                        ? new Date(item.doacoes.data_doacao).toLocaleDateString('pt-BR')
+                        : '-';
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50 border-b border-gray-200 transition duration-150";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-medium text-gray-900 text-xs">${item.descricao_item}</td>
+                        <td class="px-6 py-4 text-center font-bold text-gray-900 text-xs">${item.quantidade}</td>
+                        <td class="px-6 py-4 text-xs">${item.unidade_medida}</td>
+                        <td class="px-6 py-4 text-xs">${item.estado_conservacao}</td>
+                        <td class="px-6 py-4 text-xs">
+                            <span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded font-medium">${item.destino_item}</span>
+                        </td>
+                        <td class="px-6 py-4 text-xs whitespace-nowrap">${dataEntrada}</td>
+                        <td class="px-6 py-4 text-center">
+                            <button onclick="abrirEditarEstoque(${item.id_material})" class="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Item no Estoque">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            lucide.createIcons();
+        }
+
+        function filtrarEstoque() {
+            renderizarAbaEstoqueAtual();
+        }
+
+        function abrirEditarEstoque(idMaterial) {
+            const item = estoqueList.find(i => i.id_material === idMaterial);
+            if (!item) return;
+
+            // Preencher select de categorias
+            const selectCat = document.getElementById('edit-stock-categoria');
+            const originalCatSelect = document.getElementById('mat-categoria');
+            if (selectCat && originalCatSelect) {
+                selectCat.innerHTML = originalCatSelect.innerHTML;
+            }
+
+            document.getElementById('edit-stock-id').value = item.id_material;
+            document.getElementById('edit-stock-descricao').value = item.descricao_item;
+            if (selectCat) selectCat.value = item.id_categoria;
+            document.getElementById('edit-stock-qtd').value = item.quantidade;
+            document.getElementById('edit-stock-unidade').value = item.unidade_medida;
+            document.getElementById('edit-stock-estado').value = item.estado_conservacao;
+            document.getElementById('edit-stock-destino').value = item.destino_item;
+
+            mostrarModal('modal-editar-estoque');
+        }
+
+        function fecharModalEditarEstoque() {
+            fecharModal('modal-editar-estoque');
+            document.getElementById('form-editar-estoque').reset();
+        }
+
+        document.getElementById('form-editar-estoque').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            exibirCarregamentoGlobal();
+            const idMaterial = parseInt(document.getElementById('edit-stock-id').value);
+
+            const itemAtualizado = {
+                descricao_item: document.getElementById('edit-stock-descricao').value,
+                id_categoria: parseInt(document.getElementById('edit-stock-categoria').value),
+                quantidade: parseInt(document.getElementById('edit-stock-qtd').value),
+                unidade_medida: document.getElementById('edit-stock-unidade').value,
+                estado_conservacao: document.getElementById('edit-stock-estado').value,
+                destino_item: document.getElementById('edit-stock-destino').value
+            };
+
+            const { error } = await supabaseClient
+                .from('doacoes_materiais')
+                .update(itemAtualizado)
+                .eq('id_material', idMaterial);
+
+            ocultarCarregamentoGlobal();
+
+            if (error) {
+                mostrarToast('Erro ao atualizar item do estoque: ' + error.message, 'error');
+            } else {
+                mostrarToast('Item de estoque atualizado com sucesso!', 'success');
+                fecharModalEditarEstoque();
+                carregarEstoque();
+                carregarMetricas();
+                listarDoacoesAdmin();
+            }
+        });
+    </script>
+</body>
+
+</html>
