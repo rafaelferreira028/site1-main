@@ -10,6 +10,13 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script>
+        // Execução instantânea no head para evitar o "flash" branco no carregamento
+        (function () {
+            const savedTheme = localStorage.getItem('site-theme') || 'light';
+            document.documentElement.classList.add('theme-' + savedTheme);
+        })();
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
@@ -131,6 +138,346 @@
                 opacity: 1;
             }
         }
+
+        /* ============================================================
+           SISTEMA DE TEMAS E ACESSIBILIDADE VISUAL (VISÃO SENSÍVEL / FOTOFOBIA)
+           ============================================================ */
+
+        /* Prevenção de flash durante o carregamento inicial */
+        html.theme-ultra-dark, html.theme-ultra-dark body {
+            background-color: #07090e !important;
+            color: #cbd5e1 !important;
+        }
+
+        html.theme-dark, html.theme-dark body {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+
+        /* ------------------------------------------------------------
+           1. MODO ESCURO PADRÃO (.theme-dark)
+           ------------------------------------------------------------ */
+        body.theme-dark {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+        }
+
+        body.theme-dark header,
+        body.theme-dark nav {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        body.theme-dark h1, body.theme-dark h2, body.theme-dark h3, body.theme-dark h4,
+        body.theme-dark label, body.theme-dark .text-slate-800, body.theme-dark .text-slate-900,
+        body.theme-dark .text-gray-700, body.theme-dark .text-gray-800 {
+            color: #f1f5f9 !important;
+        }
+
+        body.theme-dark .text-gray-500, body.theme-dark .text-slate-500, body.theme-dark .text-gray-600 {
+            color: #94a3b8 !important;
+        }
+
+        body.theme-dark .tab-content,
+        body.theme-dark .bg-white {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        body.theme-dark input,
+        body.theme-dark select,
+        body.theme-dark textarea {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+
+        body.theme-dark input:focus,
+        body.theme-dark select:focus,
+        body.theme-dark textarea:focus {
+            background-color: #0f172a !important;
+            border-color: #f43f5e !important;
+            box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.25) !important;
+        }
+
+        body.theme-dark table {
+            border-color: #334155 !important;
+        }
+
+        body.theme-dark thead, body.theme-dark th {
+            background-color: #0f172a !important;
+            color: #94a3b8 !important;
+            border-color: #334155 !important;
+        }
+
+        body.theme-dark tbody tr {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+        }
+
+        body.theme-dark tbody tr:hover {
+            background-color: #334155 !important;
+        }
+
+        body.theme-dark td {
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        body.theme-dark .modal-dialog {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        body.theme-dark #global-login-container {
+            background-color: #0f172a !important;
+        }
+
+        body.theme-dark #global-login-container > div {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        /* ------------------------------------------------------------
+           2. MODO VISÃO SENSÍVEL / ULTRA ESCURO ANTI-OFUSCAMENTO (.theme-ultra-dark)
+           Desenvolvido especialmente para fotofobia, astigmatismo e sensibilidade à luz.
+           ------------------------------------------------------------ */
+        body.theme-ultra-dark {
+            background-color: #07090e !important;
+            color: #cbd5e1 !important;
+        }
+
+        body.theme-ultra-dark header,
+        body.theme-ultra-dark nav {
+            background-color: #0d121d !important;
+            border-color: #1a2336 !important;
+        }
+
+        body.theme-ultra-dark h1, body.theme-ultra-dark h2, body.theme-ultra-dark h3, body.theme-ultra-dark h4,
+        body.theme-ultra-dark label, body.theme-ultra-dark .text-slate-800, body.theme-ultra-dark .text-slate-900,
+        body.theme-ultra-dark .text-gray-700, body.theme-ultra-dark .text-gray-800 {
+            color: #e2e8f0 !important;
+        }
+
+        body.theme-ultra-dark .text-gray-500, body.theme-ultra-dark .text-slate-500, body.theme-ultra-dark .text-gray-600 {
+            color: #808ea8 !important;
+        }
+
+        body.theme-ultra-dark .tab-content,
+        body.theme-ultra-dark .bg-white {
+            background-color: #0f1523 !important;
+            border-color: #1a2336 !important;
+            color: #cbd5e1 !important;
+            box-shadow: none !important;
+        }
+
+        /* Backgrounds cinzas e neutros */
+        body.theme-ultra-dark .bg-slate-50,
+        body.theme-ultra-dark .bg-slate-50\/50,
+        body.theme-ultra-dark .bg-gray-50,
+        body.theme-ultra-dark .bg-gray-50\/80,
+        body.theme-ultra-dark .bg-gray-100,
+        body.theme-ultra-dark .bg-gray-100\/80 {
+            background-color: #141c2e !important;
+            border-color: #1a2336 !important;
+            color: #cbd5e1 !important;
+        }
+
+        body.theme-ultra-dark .bg-gray-150 {
+            background-color: #1a253d !important;
+            color: #cbd5e1 !important;
+        }
+
+        /* Botões das Abas no Modo Visão Sensível */
+        body.theme-ultra-dark .tab-btn.bg-rose-50 {
+            background-color: #1f293d !important;
+            color: #f43f5e !important;
+            border-color: #334155 !important;
+        }
+
+        body.theme-ultra-dark .tab-btn:not(.bg-rose-50) {
+            color: #808ea8 !important;
+        }
+
+        body.theme-ultra-dark .tab-btn:hover {
+            background-color: #141c2e !important;
+            color: #e2e8f0 !important;
+        }
+
+        /* Form Inputs, Selects e Textareas */
+        body.theme-ultra-dark input,
+        body.theme-ultra-dark select,
+        body.theme-ultra-dark textarea {
+            background-color: #141c2e !important;
+            color: #e2e8f0 !important;
+            border-color: #243047 !important;
+        }
+
+        body.theme-ultra-dark input::placeholder,
+        body.theme-ultra-dark textarea::placeholder {
+            color: #64748b !important;
+        }
+
+        body.theme-ultra-dark input:focus,
+        body.theme-ultra-dark select:focus,
+        body.theme-ultra-dark textarea:focus {
+            background-color: #172136 !important;
+            border-color: #f43f5e !important;
+            box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.25) !important;
+        }
+
+        /* Botões brancos padrão */
+        body.theme-ultra-dark button.bg-white {
+            background-color: #1a2438 !important;
+            color: #e2e8f0 !important;
+            border-color: #283754 !important;
+        }
+
+        body.theme-ultra-dark button.bg-white:hover {
+            background-color: #22304a !important;
+        }
+
+        /* Caixas de Métricas e Cards Coloridos no Modo Ultra Escuro */
+        body.theme-ultra-dark .bg-rose-50,
+        body.theme-ultra-dark .bg-rose-50\/20 {
+            background-color: rgba(225, 29, 72, 0.12) !important;
+            border-color: rgba(225, 29, 72, 0.25) !important;
+            color: #fda4af !important;
+        }
+
+        body.theme-ultra-dark .bg-blue-50,
+        body.theme-ultra-dark .bg-blue-50\/20 {
+            background-color: rgba(59, 130, 246, 0.12) !important;
+            border-color: rgba(59, 130, 246, 0.25) !important;
+            color: #93c5fd !important;
+        }
+
+        body.theme-ultra-dark .bg-emerald-50,
+        body.theme-ultra-dark .bg-emerald-50\/20 {
+            background-color: rgba(16, 185, 129, 0.12) !important;
+            border-color: rgba(16, 185, 129, 0.25) !important;
+            color: #6ee7b7 !important;
+        }
+
+        body.theme-ultra-dark .bg-amber-50,
+        body.theme-ultra-dark .bg-amber-50\/20 {
+            background-color: rgba(217, 119, 6, 0.12) !important;
+            border-color: rgba(217, 119, 6, 0.25) !important;
+            color: #fde68a !important;
+        }
+
+        body.theme-ultra-dark .bg-sky-50,
+        body.theme-ultra-dark .bg-sky-50\/20 {
+            background-color: rgba(14, 165, 233, 0.12) !important;
+            border-color: rgba(14, 165, 233, 0.25) !important;
+            color: #7dd3fc !important;
+        }
+
+        /* Ícones dentro dos cards de estatísticas */
+        body.theme-ultra-dark .text-rose-600 { color: #f43f5e !important; }
+        body.theme-ultra-dark .text-blue-600 { color: #60a5fa !important; }
+        body.theme-ultra-dark .text-emerald-600 { color: #34d399 !important; }
+        body.theme-ultra-dark .text-amber-600 { color: #fbbf24 !important; }
+        body.theme-ultra-dark .text-sky-600 { color: #38bdf8 !important; }
+
+        /* Tabelas */
+        body.theme-ultra-dark table {
+            border-color: #1a2336 !important;
+        }
+
+        body.theme-ultra-dark thead, body.theme-ultra-dark th {
+            background-color: #101625 !important;
+            color: #94a3b8 !important;
+            border-color: #1a2336 !important;
+        }
+
+        body.theme-ultra-dark tbody tr {
+            background-color: #0f1523 !important;
+            color: #cbd5e1 !important;
+            border-color: #1a2336 !important;
+        }
+
+        body.theme-ultra-dark tbody tr:hover {
+            background-color: #172033 !important;
+        }
+
+        body.theme-ultra-dark td {
+            border-color: #1a2336 !important;
+            color: #cbd5e1 !important;
+        }
+
+        /* Modais */
+        body.theme-ultra-dark .modal-overlay {
+            background-color: rgba(4, 6, 10, 0.85) !important;
+        }
+
+        body.theme-ultra-dark .modal-dialog {
+            background-color: #0f1523 !important;
+            border-color: #243047 !important;
+            color: #cbd5e1 !important;
+        }
+
+        body.theme-ultra-dark .modal-dialog .bg-rose-600 {
+            background-color: #9f1239 !important;
+            color: #ffe4e6 !important;
+        }
+
+        /* Login Container */
+        body.theme-ultra-dark #global-login-container {
+            background-color: #07090e !important;
+        }
+
+        body.theme-ultra-dark #global-login-container > div {
+            background-color: #0f1523 !important;
+            border-color: #1a2336 !important;
+        }
+
+        /* Dropdowns de Autocomplete */
+        body.theme-ultra-dark #doador-search-results,
+        body.theme-ultra-dark #item-search-results {
+            background-color: #141c2e !important;
+            border-color: #243047 !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.theme-ultra-dark #doador-search-results div:hover,
+        body.theme-ultra-dark #item-search-results div:hover {
+            background-color: #1e2a40 !important;
+        }
+
+        /* Dropdown do Menu de Tema */
+        body.theme-ultra-dark .theme-dropdown-menu,
+        body.theme-dark .theme-dropdown-menu {
+            background-color: #141c2e !important;
+            border-color: #243047 !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.theme-ultra-dark .theme-dropdown-menu button,
+        body.theme-dark .theme-dropdown-menu button {
+            color: #cbd5e1 !important;
+        }
+
+        body.theme-ultra-dark .theme-dropdown-menu button:hover,
+        body.theme-dark .theme-dropdown-menu button:hover {
+            background-color: #1e2a40 !important;
+        }
+
+        /* Custom Scrollbar no Modo Visão Sensível */
+        body.theme-ultra-dark ::-webkit-scrollbar-track {
+            background: #090d16 !important;
+        }
+
+        body.theme-ultra-dark ::-webkit-scrollbar-thumb {
+            background: #1e293b !important;
+        }
+
+        body.theme-ultra-dark ::-webkit-scrollbar-thumb:hover {
+            background: #334155 !important;
+        }
     </style>
 </head>
 
@@ -144,8 +491,49 @@
     <div id="global-progress-bar"></div>
 
     <!-- TELA DE LOGIN GLOBAL -->
-    <!-- TELA DE LOGIN GLOBAL -->
     <div id="global-login-container" class="min-h-screen flex items-center justify-center bg-slate-50 px-4 relative">
+        <!-- SELETOR DE TEMA NO LOGIN -->
+        <div class="absolute top-5 right-5 z-20">
+            <div class="relative inline-block text-left theme-selector-container">
+                <button onclick="toggleThemeMenu(event)" type="button"
+                    class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-medium transition cursor-pointer flex items-center gap-2 shadow-sm">
+                    <span class="theme-btn-icon-container flex items-center justify-center"><i data-lucide="eye" class="w-4 h-4 text-rose-600"></i></span>
+                    <span class="theme-btn-label">Visão Sensível</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                </button>
+                <div class="theme-dropdown-menu hidden absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-slate-100 z-[9999] p-2 space-y-1 text-slate-800">
+                    <div class="px-3 py-1.5 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                        <span>Modo de Exibição</span>
+                        <span class="text-[10px] text-rose-500 font-bold bg-rose-50 px-1.5 py-0.5 rounded">Acessibilidade</span>
+                    </div>
+                    <button type="button" onclick="setTheme('light')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center gap-2.5 hover:bg-slate-50 transition text-slate-700 font-medium cursor-pointer">
+                        <i data-lucide="sun" class="w-4 h-4 text-amber-500 flex-shrink-0"></i>
+                        <div>
+                            <div class="font-semibold text-slate-800">Modo Claro</div>
+                            <div class="text-[10px] text-slate-400">Brilho padrão</div>
+                        </div>
+                    </button>
+                    <button type="button" onclick="setTheme('dark')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center gap-2.5 hover:bg-slate-50 transition text-slate-700 font-medium cursor-pointer">
+                        <i data-lucide="moon" class="w-4 h-4 text-indigo-500 flex-shrink-0"></i>
+                        <div>
+                            <div class="font-semibold text-slate-800">Modo Escuro Padrão</div>
+                            <div class="text-[10px] text-slate-400">Tons escuros convencionais</div>
+                        </div>
+                    </button>
+                    <button type="button" onclick="setTheme('ultra-dark')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center justify-between bg-rose-50/70 border border-rose-100 text-rose-900 font-semibold transition cursor-pointer">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="eye" class="w-4 h-4 text-rose-600 flex-shrink-0"></i>
+                            <div>
+                                <div class="font-bold text-rose-900">Visão Sensível</div>
+                                <div class="text-[10px] text-rose-700 font-normal">Ultra escuro / Anti-ofuscamento</div>
+                            </div>
+                        </div>
+                        <span class="bg-rose-600 text-white text-[9px] px-1.5 py-0.5 rounded-md font-bold">RECOMENDADO</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div
             class="bg-white border border-slate-200/80 p-8 rounded-2xl shadow-sm max-w-sm w-full text-center space-y-6 relative z-10 transition-all duration-200">
             <div
@@ -191,6 +579,45 @@
                     <p class="text-xs text-slate-500">Sistema Integrado de Gestão de Doações</p>
                 </div>
                 <div class="flex items-center gap-3">
+                    <!-- SELETOR DE TEMA NO HEADER -->
+                    <div class="relative inline-block text-left theme-selector-container">
+                        <button onclick="toggleThemeMenu(event)" type="button"
+                            class="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs px-3.5 py-2 rounded-xl font-medium transition cursor-pointer flex items-center gap-2 shadow-sm">
+                            <span class="theme-btn-icon-container flex items-center justify-center"><i data-lucide="eye" class="w-4 h-4 text-rose-600"></i></span>
+                            <span class="theme-btn-label">Visão Sensível</span>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                        </button>
+                        <div class="theme-dropdown-menu hidden absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-slate-100 z-[9999] p-2 space-y-1 text-slate-800">
+                            <div class="px-3 py-1.5 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                <span>Modo de Exibição</span>
+                                <span class="text-[10px] text-rose-500 font-bold bg-rose-50 px-1.5 py-0.5 rounded">Acessibilidade</span>
+                            </div>
+                            <button type="button" onclick="setTheme('light')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center gap-2.5 hover:bg-slate-50 transition text-slate-700 font-medium cursor-pointer">
+                                <i data-lucide="sun" class="w-4 h-4 text-amber-500 flex-shrink-0"></i>
+                                <div>
+                                    <div class="font-semibold text-slate-800">Modo Claro</div>
+                                    <div class="text-[10px] text-slate-400">Brilho padrão</div>
+                                </div>
+                            </button>
+                            <button type="button" onclick="setTheme('dark')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center gap-2.5 hover:bg-slate-50 transition text-slate-700 font-medium cursor-pointer">
+                                <i data-lucide="moon" class="w-4 h-4 text-indigo-500 flex-shrink-0"></i>
+                                <div>
+                                    <div class="font-semibold text-slate-800">Modo Escuro Padrão</div>
+                                    <div class="text-[10px] text-slate-400">Tons escuros convencionais</div>
+                                </div>
+                            </button>
+                            <button type="button" onclick="setTheme('ultra-dark')" class="w-full text-left px-3 py-2 text-xs rounded-xl flex items-center justify-between bg-rose-50/70 border border-rose-100 text-rose-900 font-semibold transition cursor-pointer">
+                                <div class="flex items-center gap-2.5">
+                                    <i data-lucide="eye" class="w-4 h-4 text-rose-600 flex-shrink-0"></i>
+                                    <div>
+                                        <div class="font-bold text-rose-900">Visão Sensível</div>
+                                        <div class="text-[10px] text-rose-700 font-normal">Ultra escuro / Anti-ofuscamento</div>
+                                    </div>
+                                </div>
+                                <span class="bg-rose-600 text-white text-[9px] px-1.5 py-0.5 rounded-md font-bold">RECOMENDADO</span>
+                            </button>
+                        </div>
+                    </div>
                     <span
                         class="bg-rose-50 border border-rose-100 px-3 py-1 rounded-full text-xs font-semibold text-rose-700">Painel
                         Administrativo</span>
@@ -1156,7 +1583,99 @@
 
     </div>
 
+    <!-- BOTÃO FLUTUANTE DE RÁPIDO ACESSO À ACESSIBILIDADE VISUAL -->
+    <div class="fixed bottom-5 left-5 z-[9999] theme-selector-container">
+        <button onclick="toggleThemeMenu(event)" type="button"
+            class="bg-slate-900 text-white border border-slate-700 hover:bg-slate-800 px-3.5 py-2.5 rounded-full shadow-2xl transition duration-200 flex items-center gap-2 text-xs font-semibold cursor-pointer active:scale-95"
+            title="Alternar Modo Visão Sensível (Baixa Luminosidade / Anti-Ofuscamento)">
+            <span class="theme-btn-icon-container flex items-center justify-center"><i data-lucide="eye" class="w-4 h-4 text-rose-400"></i></span>
+            <span class="hidden sm:inline theme-btn-label">Visão Sensível</span>
+        </button>
+    </div>
+
     <script>
+        // ==========================================
+        // SISTEMA DE TEMAS E ACESSIBILIDADE VISUAL
+        // (MODO VISÃO SENSÍVEL / FOTOFOBIA)
+        // ==========================================
+        let currentTheme = localStorage.getItem('site-theme') || 'light';
+
+        function applyTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem('site-theme', theme);
+
+            document.body.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
+            document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
+
+            document.body.classList.add('theme-' + theme);
+            document.documentElement.classList.add('theme-' + theme);
+
+            updateThemeUI();
+        }
+
+        function updateThemeUI() {
+            const labels = {
+                'light': 'Modo Claro',
+                'dark': 'Modo Escuro',
+                'ultra-dark': 'Visão Sensível'
+            };
+
+            const icons = {
+                'light': 'sun',
+                'dark': 'moon',
+                'ultra-dark': 'eye'
+            };
+
+            const iconColors = {
+                'light': 'text-amber-500',
+                'dark': 'text-indigo-400',
+                'ultra-dark': 'text-rose-500'
+            };
+
+            document.querySelectorAll('.theme-btn-label').forEach(el => {
+                el.textContent = labels[currentTheme] || 'Visão Sensível';
+            });
+
+            document.querySelectorAll('.theme-btn-icon-container').forEach(container => {
+                const iconName = icons[currentTheme] || 'eye';
+                const colorClass = iconColors[currentTheme] || 'text-rose-500';
+                container.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4 ${colorClass}"></i>`;
+            });
+
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        function setTheme(theme) {
+            applyTheme(theme);
+            closeThemeMenus();
+
+            if (theme === 'ultra-dark') {
+                mostrarToast('Modo Visão Sensível (Baixa Luminosidade) ativado com sucesso!', 'info');
+            } else if (theme === 'dark') {
+                mostrarToast('Modo Escuro Padrão ativado!', 'info');
+            } else {
+                mostrarToast('Modo Claro Padrão ativado!', 'info');
+            }
+        }
+
+        function toggleThemeMenu(event) {
+            if (event) event.stopPropagation();
+            const menus = document.querySelectorAll('.theme-dropdown-menu');
+            menus.forEach(menu => menu.classList.toggle('hidden'));
+        }
+
+        function closeThemeMenus() {
+            const menus = document.querySelectorAll('.theme-dropdown-menu');
+            menus.forEach(menu => menu.classList.add('hidden'));
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.theme-selector-container')) {
+                closeThemeMenus();
+            }
+        });
         const SUPABASE_URL = "https://bevvvsghutwpnexuczda.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_CaMU6q53y-n9p0PXW4F1Ow_bgYrD9Mm";
 
@@ -1544,6 +2063,7 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
+            applyTheme(currentTheme);
             exibirCarregamentoGlobal();
             verificarAutenticacaoGlobal();
             Promise.all([
