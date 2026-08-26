@@ -1,11 +1,7 @@
 const { useState, useEffect } = React;
-import { buscarEstoqueMateriais, buscarEstoqueDoacoesCanais } from '../../services/estoqueService.js';
-import { exportarPDFEstoqueOficial } from '../../services/pdfService.js';
-import { formatarMoeda } from '../../utils/formatters.js';
-import { useToast } from '../../context/ToastContext.jsx';
 
-export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
-    const { mostrarToast } = useToast();
+function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
+    const { mostrarToast } = window.useToast();
 
     const [estoqueSubTab, setEstoqueSubTab] = useState('Geral');
     const [modoVisao, setModoVisao] = useState('consolidado');
@@ -25,11 +21,11 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
         setLoadingData(true);
         if (onLoadingStart) onLoadingStart();
         try {
-            const { data: matData } = await buscarEstoqueMateriais();
+            const { data: matData } = await window.estoqueService.buscarEstoqueMateriais();
             const listMat = matData || [];
             setEstoqueList(listMat);
 
-            const { data: doaData } = await buscarEstoqueDoacoesCanais();
+            const { data: doaData } = await window.estoqueService.buscarEstoqueDoacoesCanais();
             setEstoqueDoacoesList(doaData || []);
 
             // Calcular Métricas
@@ -67,7 +63,7 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
     const handleGerarPDF = async () => {
         if (onLoadingStart) onLoadingStart();
         try {
-            const res = await exportarPDFEstoqueOficial();
+            const res = await window.pdfService.exportarPDFEstoqueOficial();
             if (res.success) {
                 mostrarToast('Relatório de estoque em PDF baixado com sucesso!', 'success');
             } else {
@@ -82,7 +78,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
 
     const isCanalTab = ['Presencial', 'PIX', 'Dinheiro'].includes(estoqueSubTab);
 
-    // Filtrar Doações de Canais
     const query = searchQuery.toLowerCase().trim();
     let canalDoacoesFiltradas = estoqueDoacoesList.filter(d => d.canal_recebimento === estoqueSubTab);
     if (query) {
@@ -105,7 +100,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
         });
     }
 
-    // Filtrar Materiais de Estoque
     let materiaisFiltrados = [];
     if (estoqueSubTab === 'Geral') {
         materiaisFiltrados = estoqueList;
@@ -127,7 +121,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
         });
     }
 
-    // Agrupar Consolidados
     const gruposConsolidados = {};
     if (modoVisao === 'consolidado') {
         materiaisFiltrados.forEach(item => {
@@ -162,7 +155,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
 
     return (
         <div id="tab-estoque" className="tab-content active visible space-y-6">
-            {/* Header com Ações Rápidas do Estoque */}
             <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
@@ -184,7 +176,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                 </div>
             </div>
 
-            {/* Grid de Cards Métricas do Estoque */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-rose-100/80 bg-rose-50/20 flex items-center gap-4 shadow-xs hover-scale cursor-default">
                     <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl border border-rose-200/50 flex-shrink-0">
@@ -227,9 +218,7 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                 </div>
             </div>
 
-            {/* Navegação Interna de Estoque */}
             <div className="space-y-4 mb-6 border-b border-gray-200 pb-6">
-                {/* Seção 1: Categorias Dedicadas */}
                 <div>
                     <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Inventário de Conteúdo e Itens Doados</span>
                     <div className="flex flex-wrap gap-2">
@@ -278,7 +267,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                     </div>
                 </div>
 
-                {/* Seção 2: Entradas por Canais de Arrecadação */}
                 <div>
                     <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Entradas Filtradas por Canais de Arrecadação</span>
                     <div className="flex flex-wrap gap-2">
@@ -307,7 +295,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                 </div>
             </div>
 
-            {/* Banner Informativo */}
             {!isCanalTab && (
                 <div id="banner-estoque-materiais" className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 flex items-center gap-3">
                     <div id="banner-icon-container" className={`p-3 rounded-xl ${currentBannerInfo.color}`}>
@@ -320,7 +307,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                 </div>
             )}
 
-            {/* Controles da Tabela: Busca e Alternância de Visão */}
             <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-gray-100 pb-4">
                     <div className="relative w-full md:w-80">
@@ -356,7 +342,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                     )}
                 </div>
 
-                {/* Tabela de Canais */}
                 {isCanalTab && (
                     <div id="container-estoque-canais" className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
@@ -401,7 +386,7 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                                                 <td className="px-6 py-4 text-xs leading-relaxed">
                                                     {hasFin && (
                                                         <div>
-                                                            <strong>{formatarMoeda(fin.valor)}</strong>
+                                                            <strong>{window.formatarMoeda(fin.valor)}</strong>
                                                             {fin.comprovante_transacao && <span className="text-xs text-gray-500 font-mono block">ID: {fin.comprovante_transacao}</span>}
                                                         </div>
                                                     )}
@@ -437,7 +422,6 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
                     </div>
                 )}
 
-                {/* Tabela de Materiais */}
                 {!isCanalTab && (
                     <div id="container-estoque-materiais" className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
@@ -543,3 +527,5 @@ export function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueCons
         </div>
     );
 }
+
+window.EstoqueTab = EstoqueTab;

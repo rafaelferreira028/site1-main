@@ -1,12 +1,7 @@
 const { useState, useEffect } = React;
-import { buscarDoadoresTodos, deletarDoadorCascata } from '../../services/doadoresService.js';
-import { buscarDoacoesAdmin, deletarDoacaoCompleta } from '../../services/doacoesService.js';
-import { formatarDocumento, formatarTelefone, formatarDataBR, formatarMoeda } from '../../utils/formatters.js';
-import { useToast } from '../../context/ToastContext.jsx';
-import { supabaseClient } from '../../config/supabaseClient.js';
 
-export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged, onLoadingStart, onLoadingEnd }) {
-    const { mostrarToast } = useToast();
+function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged, onLoadingStart, onLoadingEnd }) {
+    const { mostrarToast } = window.useToast();
 
     const [adminSubTab, setAdminSubTab] = useState('doadores');
     const [searchQuery, setSearchQuery] = useState('');
@@ -22,15 +17,15 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
     const [metricMateriais, setMetricMateriais] = useState(0);
 
     const carregarMetricas = async () => {
-        if (!supabaseClient) return;
+        if (!window.supabaseClient) return;
         try {
-            const { count: doadoresCount } = await supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
-            const { count: doacoesCount } = await supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
+            const { count: doadoresCount } = await window.supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
+            const { count: doacoesCount } = await window.supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
 
-            const { data: finData } = await supabaseClient.from('doacoes_financeiras').select('valor');
+            const { data: finData } = await window.supabaseClient.from('doacoes_financeiras').select('valor');
             const totalFin = finData ? finData.reduce((acc, r) => acc + parseFloat(r.valor || 0), 0) : 0;
 
-            const { data: matData } = await supabaseClient.from('doacoes_materiais').select('quantidade');
+            const { data: matData } = await window.supabaseClient.from('doacoes_materiais').select('quantidade');
             const totalMat = matData ? matData.reduce((acc, r) => acc + parseInt(r.quantidade || 0), 0) : 0;
 
             setMetricDoadores(doadoresCount || 0);
@@ -47,10 +42,10 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
         if (onLoadingStart) onLoadingStart();
         try {
             await carregarMetricas();
-            const { data: dData } = await buscarDoadoresTodos();
+            const { data: dData } = await window.doadoresService.buscarDoadoresTodos();
             setDoadoresList(dData || []);
 
-            const { data: doaData } = await buscarDoacoesAdmin();
+            const { data: doaData } = await window.doacoesService.buscarDoacoesAdmin();
             setDoacoesList(doaData || []);
         } catch (e) {
             console.error("Erro ao carregar dados admin:", e);
@@ -81,7 +76,7 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
 
         if (onLoadingStart) onLoadingStart();
         try {
-            await deletarDoadorCascata(idDoador);
+            await window.doadoresService.deletarDoadorCascata(idDoador);
             mostrarToast('Doador e todas as doações associadas foram deletados com sucesso!', 'success');
             await carregarDadosAdmin();
             if (onDataChanged) onDataChanged();
@@ -99,7 +94,7 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
 
         if (onLoadingStart) onLoadingStart();
         try {
-            await deletarDoacaoCompleta(idDoacao);
+            await window.doacoesService.deletarDoacaoCompleta(idDoacao);
             mostrarToast('Doação excluída com sucesso!', 'success');
             await carregarDadosAdmin();
             if (onDataChanged) onDataChanged();
@@ -169,7 +164,7 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
                     </div>
                     <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Arrecadado (R$)</p>
-                        <h3 id="metric-financeiro" className="text-2xl font-extrabold text-slate-900 tracking-tight leading-none mt-1">{formatarMoeda(metricFinanceiro)}</h3>
+                        <h3 id="metric-financeiro" className="text-2xl font-extrabold text-slate-900 tracking-tight leading-none mt-1">{window.formatarMoeda(metricFinanceiro)}</h3>
                     </div>
                 </div>
 
@@ -250,10 +245,10 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
                                         <tr key={doador.id_doador} className="hover:bg-gray-50 border-b border-gray-200 transition duration-150">
                                             <td className="px-6 py-4 font-medium text-gray-900">{doador.nome}</td>
                                             <td className="px-6 py-4 text-xs font-semibold text-gray-500">{doador.tipo_doador === 'PF' ? 'Pessoa Física (PF)' : 'Pessoa Jurídica (PJ)'}</td>
-                                            <td className="px-6 py-4 font-mono text-xs">{formatarDocumento(doador.documento || '', doador.tipo_doador) || '-'}</td>
+                                            <td className="px-6 py-4 font-mono text-xs">{window.formatarDocumento(doador.documento || '', doador.tipo_doador) || '-'}</td>
                                             <td className="px-6 py-4 text-xs">{doador.cidade || '-'}</td>
-                                            <td className="px-6 py-4 text-xs font-mono">{formatarDataBR(doador.data_nascimento)}</td>
-                                            <td className="px-6 py-4 text-xs">{formatarTelefone(doador.telefone || '') || '-'}</td>
+                                            <td className="px-6 py-4 text-xs font-mono">{window.formatarDataBR(doador.data_nascimento)}</td>
+                                            <td className="px-6 py-4 text-xs">{window.formatarTelefone(doador.telefone || '') || '-'}</td>
                                             <td className="px-6 py-4 text-xs">{doador.email || '-'}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex justify-center gap-2">
@@ -324,7 +319,7 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
                                                 </td>
                                                 <td className="px-6 py-4 text-xs leading-relaxed">
                                                     {hasFin && (
-                                                        <div><strong>{formatarMoeda(fin.valor)}</strong></div>
+                                                        <div><strong>{window.formatarMoeda(fin.valor)}</strong></div>
                                                     )}
                                                     {hasMat && (
                                                         <div>
@@ -357,3 +352,5 @@ export function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onData
         </div>
     );
 }
+
+window.AdminTab = AdminTab;

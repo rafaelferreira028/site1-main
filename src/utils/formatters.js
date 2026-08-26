@@ -1,6 +1,6 @@
 // Utilitários de Formatação e Máscaras de Dados
 
-export function formatarCPF(val) {
+function formatarCPF(val) {
     if (!val) return "";
     val = val.replace(/\D/g, "").slice(0, 11);
     return val
@@ -9,7 +9,7 @@ export function formatarCPF(val) {
         .replace(/\.(\d{3})(\d)/, ".$1-$2");
 }
 
-export function formatarCNPJ(val) {
+function formatarCNPJ(val) {
     if (!val) return "";
     val = val.replace(/\D/g, "").slice(0, 14);
     return val
@@ -19,7 +19,7 @@ export function formatarCNPJ(val) {
         .replace(/(\d{4})(\d)/, "$1-$2");
 }
 
-export function formatarDocumento(val, tipo) {
+function formatarDocumento(val, tipo) {
     if (!val) return "";
     if (tipo === 'PF') {
         return formatarCPF(val);
@@ -35,7 +35,7 @@ export function formatarDocumento(val, tipo) {
     }
 }
 
-export function formatarTelefone(val) {
+function formatarTelefone(val) {
     if (!val) return "";
     val = val.replace(/\D/g, "").slice(0, 11);
     if (val.length > 10) {
@@ -49,12 +49,12 @@ export function formatarTelefone(val) {
     }
 }
 
-export function formatarMoeda(valor) {
+function formatarMoeda(valor) {
     const num = parseFloat(valor || 0);
     return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function formatarDataBR(dataIso) {
+function formatarDataBR(dataIso) {
     if (!dataIso) return '-';
     const partes = dataIso.split('-');
     if (partes.length === 3) {
@@ -66,7 +66,7 @@ export function formatarDataBR(dataIso) {
     return dataIso;
 }
 
-export function limitarAnoDataInput(input) {
+function limitarAnoDataInput(input) {
     if (!input || !input.value) return;
     const partes = input.value.split('-');
     if (partes[0] && partes[0].length > 4) {
@@ -74,3 +74,11 @@ export function limitarAnoDataInput(input) {
         input.value = partes.join('-');
     }
 }
+
+window.formatarCPF = formatarCPF;
+window.formatarCNPJ = formatarCNPJ;
+window.formatarDocumento = formatarDocumento;
+window.formatarTelefone = formatarTelefone;
+window.formatarMoeda = formatarMoeda;
+window.formatarDataBR = formatarDataBR;
+window.limitarAnoDataInput = limitarAnoDataInput;

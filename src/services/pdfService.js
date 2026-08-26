@@ -1,11 +1,9 @@
-import { supabaseClient } from '../config/supabaseClient.js';
-
-export async function exportarPDFEstoqueOficial() {
+async function exportarPDFEstoqueOficial() {
     if (!window.jspdf || !window.jspdf.jsPDF) {
         throw new Error("Biblioteca jsPDF não carregada na página.");
     }
 
-    const { data: matData, error } = await supabaseClient
+    const { data: matData, error } = await window.supabaseClient
         .from('doacoes_materiais')
         .select('*, categorias_itens(nome_categoria)')
         .order('id_categoria', { ascending: true });
@@ -133,3 +131,7 @@ export async function exportarPDFEstoqueOficial() {
 
     return { success: true, filename: nomeArquivo };
 }
+
+window.pdfService = {
+    exportarPDFEstoqueOficial
+};

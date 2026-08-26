@@ -98,7 +98,9 @@ textarea:focus {
     background: rgba(156, 163, 175, 0.7);
 }
 
-/* Modo Escuro Padrão */
+/* ==========================================
+   MODO ESCURO PADRÃO (.theme-dark)
+   ========================================== */
 .theme-dark {
     background-color: #0f172a !important;
     color: #f8fafc !important;
@@ -106,11 +108,13 @@ textarea:focus {
 
 .theme-dark .bg-slate-50,
 .theme-dark .bg-gray-50,
-.theme-dark .bg-slate-100 {
+.theme-dark .bg-slate-100,
+.theme-dark .bg-gray-100 {
     background-color: #1e293b !important;
 }
 
-.theme-dark .bg-white {
+.theme-dark .bg-white,
+.theme-dark .bg-white\/80 {
     background-color: #1e293b !important;
     border-color: #334155 !important;
     color: #f8fafc !important;
@@ -126,8 +130,33 @@ textarea:focus {
 
 .theme-dark .text-gray-500,
 .theme-dark .text-gray-600,
-.theme-dark .text-slate-500 {
+.theme-dark .text-slate-500,
+.theme-dark .text-gray-400 {
     color: #94a3b8 !important;
+}
+
+.theme-dark .bg-white.modal-dialog,
+.theme-dark .theme-dropdown-menu,
+.theme-dark #dropdown-doadores-form {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+/* Prevenção de Hovers Claros no Modo Escuro */
+.theme-dark .hover\:bg-gray-50:hover,
+.theme-dark .hover\:bg-gray-100:hover,
+.theme-dark .hover\:bg-slate-50:hover,
+.theme-dark .hover\:bg-slate-100:hover,
+.theme-dark .hover\:bg-rose-50:hover,
+.theme-dark .hover\:bg-blue-50:hover,
+.theme-dark .hover\:bg-emerald-50:hover {
+    background-color: #334155 !important;
+    color: #ffffff !important;
+}
+
+.theme-dark tr:hover {
+    background-color: rgba(51, 65, 85, 0.5) !important;
 }
 
 .theme-dark input,
@@ -149,11 +178,48 @@ textarea:focus {
     color: #e2e8f0 !important;
 }
 
-.theme-dark tr:hover {
-    background-color: #334155/50 !important;
+.theme-dark .bg-rose-50,
+.theme-dark .bg-rose-50\/60,
+.theme-dark .bg-rose-50\/20,
+.theme-dark .bg-rose-50\/50,
+.theme-dark .bg-rose-50\/40,
+.theme-dark .bg-rose-50\/80 {
+    background-color: rgba(225, 29, 72, 0.15) !important;
+    border-color: rgba(225, 29, 72, 0.3) !important;
+    color: #fda4af !important;
 }
 
-/* MODO VISÃO SENSÍVEL / FOTOFOBIA (ULTRA DARK - ALTO CONTRASTE SUAVE) */
+.theme-dark .bg-emerald-50,
+.theme-dark .bg-emerald-50\/50 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    color: #6ee7b7 !important;
+}
+
+.theme-dark .bg-blue-50,
+.theme-dark .bg-blue-50\/50 {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    color: #93c5fd !important;
+}
+
+.theme-dark .bg-amber-50,
+.theme-dark .bg-amber-50\/20 {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    border-color: rgba(245, 158, 11, 0.3) !important;
+    color: #fde047 !important;
+}
+
+.theme-dark .bg-sky-50,
+.theme-dark .bg-sky-50\/20 {
+    background-color: rgba(14, 165, 233, 0.15) !important;
+    border-color: rgba(14, 165, 233, 0.3) !important;
+    color: #7dd3fc !important;
+}
+
+/* ==========================================
+   MODO VISÃO SENSÍVEL / FOTOFOBIA (.theme-ultra-dark)
+   ========================================== */
 .theme-ultra-dark {
     background-color: #05080e !important;
     color: #e2e8f0 !important;
@@ -161,11 +227,13 @@ textarea:focus {
 
 .theme-ultra-dark .bg-slate-50,
 .theme-ultra-dark .bg-gray-50,
-.theme-ultra-dark .bg-slate-100 {
+.theme-ultra-dark .bg-slate-100,
+.theme-ultra-dark .bg-gray-100 {
     background-color: #0c121e !important;
 }
 
-.theme-ultra-dark .bg-white {
+.theme-ultra-dark .bg-white,
+.theme-ultra-dark .bg-white\/80 {
     background-color: #0f172a !important;
     border-color: #1e293b !important;
     color: #f1f5f9 !important;
@@ -181,8 +249,33 @@ textarea:focus {
 
 .theme-ultra-dark .text-gray-500,
 .theme-ultra-dark .text-gray-600,
-.theme-ultra-dark .text-slate-500 {
+.theme-ultra-dark .text-slate-500,
+.theme-ultra-dark .text-gray-400 {
     color: #94a3b8 !important;
+}
+
+.theme-ultra-dark .bg-white.modal-dialog,
+.theme-ultra-dark .theme-dropdown-menu,
+.theme-ultra-dark #dropdown-doadores-form {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
+/* Prevenção de Hovers Claros no Modo Visão Sensível */
+.theme-ultra-dark .hover\:bg-gray-50:hover,
+.theme-ultra-dark .hover\:bg-gray-100:hover,
+.theme-ultra-dark .hover\:bg-slate-50:hover,
+.theme-ultra-dark .hover\:bg-slate-100:hover,
+.theme-ultra-dark .hover\:bg-rose-50:hover,
+.theme-ultra-dark .hover\:bg-blue-50:hover,
+.theme-ultra-dark .hover\:bg-emerald-50:hover {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
+.theme-ultra-dark tr:hover {
+    background-color: rgba(30, 41, 59, 0.6) !important;
 }
 
 .theme-ultra-dark input,
@@ -204,15 +297,41 @@ textarea:focus {
     color: #cbd5e1 !important;
 }
 
-.theme-ultra-dark tr:hover {
-    background-color: #1e293b/60 !important;
-}
-
-.theme-ultra-dark .bg-rose-50 {
-    background-color: rgba(159, 18, 57, 0.2) !important;
+.theme-ultra-dark .bg-rose-50,
+.theme-ultra-dark .bg-rose-50\/60,
+.theme-ultra-dark .bg-rose-50\/20,
+.theme-ultra-dark .bg-rose-50\/50,
+.theme-ultra-dark .bg-rose-50\/40,
+.theme-ultra-dark .bg-rose-50\/80 {
+    background-color: rgba(159, 18, 57, 0.25) !important;
+    border-color: rgba(225, 29, 72, 0.4) !important;
     color: #fecdd3 !important;
 }
 
-.theme-ultra-dark .border-rose-100 {
-    border-color: rgba(225, 29, 72, 0.3) !important;
+.theme-ultra-dark .bg-emerald-50,
+.theme-ultra-dark .bg-emerald-50\/50 {
+    background-color: rgba(6, 78, 59, 0.3) !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+    color: #a7f3d0 !important;
+}
+
+.theme-ultra-dark .bg-blue-50,
+.theme-ultra-dark .bg-blue-50\/50 {
+    background-color: rgba(30, 58, 138, 0.3) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+    color: #bfdbfe !important;
+}
+
+.theme-ultra-dark .bg-amber-50,
+.theme-ultra-dark .bg-amber-50\/20 {
+    background-color: rgba(120, 53, 15, 0.3) !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+    color: #fef08a !important;
+}
+
+.theme-ultra-dark .bg-sky-50,
+.theme-ultra-dark .bg-sky-50\/20 {
+    background-color: rgba(12, 74, 110, 0.3) !important;
+    border-color: rgba(14, 165, 233, 0.4) !important;
+    color: #bae6fd !important;
 }

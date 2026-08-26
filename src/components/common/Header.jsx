@@ -1,9 +1,8 @@
 const { useEffect } = React;
-import { useAuth } from '../../context/AuthContext.jsx';
-import { ThemeSelector } from './ThemeSelector.jsx';
 
-export function Header() {
-    const { logout } = useAuth();
+function Header() {
+    const { logout } = window.useAuth();
+    const ThemeSelector = window.ThemeSelector;
 
     useEffect(() => {
         if (window.lucide) {
@@ -31,7 +30,7 @@ export function Header() {
                 <button
                     id="btn-global-logout"
                     onClick={logout}
-                    className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-gray-100 text-gray-700 hover:bg-rose-50 hover:text-rose-600 transition duration-150 focus:outline-none cursor-pointer flex items-center gap-1.5"
+                    className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:bg-rose-600 hover:text-white transition duration-150 focus:outline-none cursor-pointer flex items-center gap-1.5"
                     title="Sair do Sistema"
                 >
                     <i data-lucide="log-out" className="w-4 h-4"></i>
@@ -46,3 +45,5 @@ export function Header() {
         </header>
     );
 }
+
+window.Header = Header;

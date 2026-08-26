@@ -1,8 +1,7 @@
 const { useEffect } = React;
-import { useToast } from '../../context/ToastContext.jsx';
 
-export function ToastContainer() {
-    const { toasts, removerToast } = useToast();
+function ToastContainer() {
+    const { toasts, removerToast } = window.useToast();
 
     useEffect(() => {
         if (window.lucide) {
@@ -11,7 +10,7 @@ export function ToastContainer() {
     }, [toasts]);
 
     return (
-        <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2.5 pointer-events-none">
+        <div id="toast-container" className="fixed top-5 right-5 z-50 flex flex-col gap-2.5 pointer-events-none">
             {toasts.map(toast => {
                 let bgClass = '';
                 let iconName = '';
@@ -44,3 +43,5 @@ export function ToastContainer() {
         </div>
     );
 }
+
+window.ToastContainer = ToastContainer;

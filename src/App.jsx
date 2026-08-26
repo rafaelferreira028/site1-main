@@ -1,15 +1,14 @@
 const { useState, useEffect } = React;
-import { AuthProvider, useAuth } from './context/AuthContext.jsx';
-import { ThemeProvider } from './context/ThemeContext.jsx';
-import { ToastProvider, useToast } from './context/ToastContext.jsx';
-
-import { ToastContainer } from './components/common/ToastContainer.jsx';
-import { ProgressBar } from './components/common/ProgressBar.jsx';
-
-import { LoginView } from './views/LoginView.jsx';
-import { MainAppView } from './views/MainAppView.jsx';
 
 function AppContent() {
+    const useAuth = window.useAuth;
+    const useToast = window.useToast;
+    const ThemeProvider = window.ThemeProvider;
+    const ProgressBar = window.ProgressBar;
+    const ToastContainer = window.ToastContainer;
+    const MainAppView = window.MainAppView;
+    const LoginView = window.LoginView;
+
     const { authenticated } = useAuth();
     const { mostrarToast } = useToast();
 
@@ -48,7 +47,10 @@ function AppContent() {
     );
 }
 
-export function App() {
+function App() {
+    const ToastProvider = window.ToastProvider;
+    const AuthProvider = window.AuthProvider;
+
     return (
         <ToastProvider>
             <AuthProvider>
@@ -57,3 +59,5 @@ export function App() {
         </ToastProvider>
     );
 }
+
+window.App = App;

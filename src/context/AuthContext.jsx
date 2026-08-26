@@ -1,16 +1,15 @@
 const { createContext, useContext, useState, useEffect } = React;
-import { verificarSessaoSupabase, realizarLoginSupabase, realizarLogoutSupabase } from '../services/authService.js';
 
 const AuthContext = createContext();
 
-export function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
+function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
     const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem('app_autenticado') === 'true');
     const [session, setSession] = useState(null);
 
     const checkAuth = async () => {
         if (onLoadingStart) onLoadingStart();
         try {
-            const { session: sess } = await verificarSessaoSupabase();
+            const { session: sess } = await window.authService.verificarSessaoSupabase();
             setSession(sess);
             if (sess || sessionStorage.getItem('app_autenticado') === 'true') {
                 sessionStorage.setItem('app_autenticado', 'true');
@@ -32,11 +31,11 @@ export function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
     const login = async (email, password) => {
         if (onLoadingStart) onLoadingStart();
         try {
-            const { data, error } = await realizarLoginSupabase(email, password);
+            const { data, error } = await window.authService.realizarLoginSupabase(email, password);
             if (error) throw error;
             sessionStorage.setItem('app_autenticado', 'true');
             setAuthenticated(true);
-            setSession(data.session);
+            setSession(data ? data.session : null);
             return { success: true };
         } catch (error) {
             return { success: false, error };
@@ -48,7 +47,7 @@ export function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
     const logout = async () => {
         if (onLoadingStart) onLoadingStart();
         try {
-            await realizarLogoutSupabase();
+            await window.authService.realizarLogoutSupabase();
         } catch (e) {
             console.error(e);
         } finally {
@@ -66,6 +65,9 @@ export function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
     );
 }
 
-export function useAuth() {
+function useAuth() {
     return useContext(AuthContext);
 }
+
+window.AuthProvider = AuthProvider;
+window.useAuth = useAuth;

@@ -1,8 +1,6 @@
-import { supabaseClient } from '../config/supabaseClient.js';
-
-export async function buscarEstoqueMateriais() {
-    if (!supabaseClient) return { data: [], error: null };
-    const { data: matData, error } = await supabaseClient
+async function buscarEstoqueMateriais() {
+    if (!window.supabaseClient) return { data: [], error: null };
+    const { data: matData, error } = await window.supabaseClient
         .from('doacoes_materiais')
         .select('*, categorias_itens(nome_categoria), doacoes(data_doacao, canal_recebimento, observacoes)')
         .order('id_material', { ascending: false });
@@ -19,9 +17,9 @@ export async function buscarEstoqueMateriais() {
     return { data: listaNormalizada, error: null };
 }
 
-export async function buscarEstoqueDoacoesCanais() {
-    if (!supabaseClient) return { data: [], error: null };
-    const { data: doaData, error } = await supabaseClient
+async function buscarEstoqueDoacoesCanais() {
+    if (!window.supabaseClient) return { data: [], error: null };
+    const { data: doaData, error } = await window.supabaseClient
         .from('doacoes')
         .select('*, doacoes_financeiras(*), doacoes_materiais(*, categorias_itens(nome_categoria)))')
         .order('data_doacao', { ascending: false });
@@ -38,19 +36,19 @@ export async function buscarEstoqueDoacoesCanais() {
     return { data: listaNormalizada, error: null };
 }
 
-export async function atualizarItemEstoqueLote(idMaterial, dadosItem) {
-    if (!supabaseClient) throw new Error("Supabase não disponível");
-    return await supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
+async function atualizarItemEstoqueLote(idMaterial, dadosItem) {
+    if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    return await window.supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
 }
 
-export async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
-    if (!supabaseClient) throw new Error("Supabase não disponível");
+async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
+    if (!window.supabaseClient) throw new Error("Supabase não disponível");
     const updatePromises = lotes.map((lote, index) => {
         let qtdLote = lote.quantidade;
         if (index === 0) {
             qtdLote = Math.max(0, lote.quantidade + diferenca);
         }
-        return supabaseClient
+        return window.supabaseClient
             .from('doacoes_materiais')
             .update({
                 ...novosDados,
@@ -64,3 +62,10 @@ export async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) 
     if (hasError) throw new Error("Erro ao atualizar alguns lotes do estoque.");
     return true;
 }
+
+window.estoqueService = {
+    buscarEstoqueMateriais,
+    buscarEstoqueDoacoesCanais,
+    atualizarItemEstoqueLote,
+    atualizarEstoqueConsolidado
+};

@@ -1,6 +1,6 @@
 const { useEffect } = React;
 
-export function Navbar({ activeTab, onSwitchTab }) {
+function Navbar({ activeTab, onSwitchTab }) {
     useEffect(() => {
         if (window.lucide) {
             lucide.createIcons();
@@ -37,3 +37,5 @@ export function Navbar({ activeTab, onSwitchTab }) {
         </nav>
     );
 }
+
+window.Navbar = Navbar;

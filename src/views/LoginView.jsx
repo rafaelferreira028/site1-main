@@ -1,9 +1,9 @@
 const { useState, useEffect } = React;
-import { useAuth } from '../context/AuthContext.jsx';
-import { ThemeSelector } from '../components/common/ThemeSelector.jsx';
 
-export function LoginView() {
-    const { login } = useAuth();
+function LoginView() {
+    const { login } = window.useAuth();
+    const ThemeSelector = window.ThemeSelector;
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
@@ -87,3 +87,5 @@ export function LoginView() {
         </div>
     );
 }
+
+window.LoginView = LoginView;

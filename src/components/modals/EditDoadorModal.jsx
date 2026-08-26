@@ -1,8 +1,6 @@
 const { useState, useEffect } = React;
-import { formatarDocumento, formatarTelefone } from '../../utils/formatters.js';
-import { aplicarMascaraInput } from '../../utils/masks.js';
 
-export function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
+function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
     const [idDoador, setIdDoador] = useState('');
     const [nome, setNome] = useState('');
     const [tipoDoador, setTipoDoador] = useState('PF');
@@ -17,8 +15,8 @@ export function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
             setIdDoador(doador.id_doador || '');
             setNome(doador.nome || '');
             setTipoDoador(doador.tipo_doador || 'PF');
-            setDocumento(formatarDocumento(doador.documento || '', doador.tipo_doador || 'PF'));
-            setTelefone(formatarTelefone(doador.telefone || ''));
+            setDocumento(window.formatarDocumento(doador.documento || '', doador.tipo_doador || 'PF'));
+            setTelefone(window.formatarTelefone(doador.telefone || ''));
             setEmail(doador.email || '');
             setCidade(doador.cidade || '');
             setDataNascimento(doador.data_nascimento || '');
@@ -83,14 +81,14 @@ export function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
                             <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200/80 h-[42px] items-center">
                                 <button
                                     type="button"
-                                    onClick={() => { setTipoDoador('PF'); setDocumento(formatarDocumento(documento, 'PF')); }}
+                                    onClick={() => { setTipoDoador('PF'); setDocumento(window.formatarDocumento(documento, 'PF')); }}
                                     className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PF' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}
                                 >
                                     <i data-lucide="user" className="w-4 h-4"></i> Pessoa Física (PF)
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => { setTipoDoador('PJ'); setDocumento(formatarDocumento(documento, 'PJ')); }}
+                                    onClick={() => { setTipoDoador('PJ'); setDocumento(window.formatarDocumento(documento, 'PJ')); }}
                                     className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PJ' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}
                                 >
                                     <i data-lucide="building-2" className="w-4 h-4"></i> Pessoa Jurídica (PJ)
@@ -107,7 +105,7 @@ export function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
                                 type="text"
                                 id="edit-doador-documento"
                                 value={documento}
-                                onChange={(e) => setDocumento(formatarDocumento(e.target.value, tipoDoador))}
+                                onChange={(e) => setDocumento(window.formatarDocumento(e.target.value, tipoDoador))}
                                 maxLength={tipoDoador === 'PF' ? 14 : 18}
                                 placeholder={tipoDoador === 'PF' ? "000.000.000-00" : "00.000.000/0000-00"}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500 font-mono"
@@ -122,7 +120,7 @@ export function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
                                 type="tel"
                                 id="edit-doador-telefone"
                                 value={telefone}
-                                onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+                                onChange={(e) => setTelefone(window.formatarTelefone(e.target.value))}
                                 maxLength={15}
                                 placeholder="(00) 00000-0000"
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500 font-mono"
@@ -187,3 +185,5 @@ export function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
         </div>
     );
 }
+
+window.EditDoadorModal = EditDoadorModal;

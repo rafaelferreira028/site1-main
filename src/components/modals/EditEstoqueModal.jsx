@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-export function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, onSave }) {
+function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, onSave }) {
     const [idMaterial, setIdMaterial] = useState('');
     const [descricao, setDescricao] = useState('');
     const [categoria, setCategoria] = useState('');
@@ -174,3 +174,5 @@ export function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onC
         </div>
     );
 }
+
+window.EditEstoqueModal = EditEstoqueModal;

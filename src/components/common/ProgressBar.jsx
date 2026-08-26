@@ -1,4 +1,4 @@
-export function ProgressBar({ width, opacity }) {
+function ProgressBar({ width, opacity }) {
     return (
         <div
             id="global-progress-bar"
@@ -9,3 +9,5 @@ export function ProgressBar({ width, opacity }) {
         />
     );
 }
+
+window.ProgressBar = ProgressBar;

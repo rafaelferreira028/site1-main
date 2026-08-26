@@ -1,6 +1,6 @@
 // Handlers de Máscara em Inputs HTML nativos
 
-export function aplicarMascaraInput(inputElement, formatarFn) {
+function aplicarMascaraInput(inputElement, formatarFn) {
     if (!inputElement) return;
 
     inputElement.addEventListener('keydown', (e) => {
@@ -60,3 +60,5 @@ export function aplicarMascaraInput(inputElement, formatarFn) {
         inputElement.setSelectionRange(newPos, newPos);
     });
 }
+
+window.aplicarMascaraInput = aplicarMascaraInput;

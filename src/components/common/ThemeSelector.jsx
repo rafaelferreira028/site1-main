@@ -1,8 +1,7 @@
 const { useEffect } = React;
-import { useTheme } from '../../context/ThemeContext.jsx';
 
-export function ThemeSelector() {
-    const { theme, changeTheme, menuOpen, toggleMenu } = useTheme();
+function ThemeSelector() {
+    const { theme, changeTheme, menuOpen, toggleMenu } = window.useTheme();
 
     const labels = {
         'light': 'Modo Claro',
@@ -82,3 +81,5 @@ export function ThemeSelector() {
         </div>
     );
 }
+
+window.ThemeSelector = ThemeSelector;

@@ -1,20 +1,24 @@
-import { supabaseClient } from '../config/supabaseClient.js';
-
-export async function verificarSessaoSupabase() {
-    if (!supabaseClient) return { session: null };
-    const { data: { session } } = await supabaseClient.auth.getSession();
+async function verificarSessaoSupabase() {
+    if (!window.supabaseClient) return { session: null };
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
     return { session };
 }
 
-export async function realizarLoginSupabase(email, password) {
-    if (!supabaseClient) throw new Error("Supabase não configurado");
-    return await supabaseClient.auth.signInWithPassword({
+async function realizarLoginSupabase(email, password) {
+    if (!window.supabaseClient) throw new Error("Supabase não configurado");
+    return await window.supabaseClient.auth.signInWithPassword({
         email,
         password
     });
 }
 
-export async function realizarLogoutSupabase() {
-    if (!supabaseClient) return;
-    return await supabaseClient.auth.signOut();
+async function realizarLogoutSupabase() {
+    if (!window.supabaseClient) return;
+    return await window.supabaseClient.auth.signOut();
 }
+
+window.authService = {
+    verificarSessaoSupabase,
+    realizarLoginSupabase,
+    realizarLogoutSupabase
+};

@@ -1,10 +1,7 @@
 const { useState, useEffect } = React;
-import { criarEventoDoacao, criarDoacaoFinanceira, criarDoacaoMaterial } from '../../services/doacoesService.js';
-import { formatarDocumento, formatarTelefone } from '../../utils/formatters.js';
-import { useToast } from '../../context/ToastContext.jsx';
 
-export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, onLoadingStart, onLoadingEnd }) {
-    const { mostrarToast } = useToast();
+function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, onLoadingStart, onLoadingEnd }) {
+    const { mostrarToast } = window.useToast();
 
     const [idDoador, setIdDoador] = useState('');
     const [doadorSearchQuery, setDoadorSearchQuery] = useState('');
@@ -104,7 +101,7 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
                 observacoes: observacoes || null
             };
 
-            const { data: doacaoCriada, error: errorPai } = await criarEventoDoacao(dadosDoacao);
+            const { data: doacaoCriada, error: errorPai } = await window.doacoesService.criarEventoDoacao(dadosDoacao);
             if (errorPai) throw errorPai;
 
             if (!doacaoCriada || doacaoCriada.length === 0) {
@@ -119,7 +116,7 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
                     valor: parseFloat(finValor),
                     comprovante_transacao: finComprovante || null
                 };
-                const { error: errorFin } = await criarDoacaoFinanceira(dadosFin);
+                const { error: errorFin } = await window.doacoesService.criarDoacaoFinanceira(dadosFin);
                 if (errorFin) mostrarToast('Erro ao salvar dados financeiros: ' + errorFin.message, 'error');
             }
 
@@ -133,7 +130,7 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
                     estado_conservacao: matEstado,
                     destino_item: matDestino
                 };
-                const { error: errorMat } = await criarDoacaoMaterial(dadosMat);
+                const { error: errorMat } = await window.doacoesService.criarDoacaoMaterial(dadosMat);
                 if (errorMat) mostrarToast('Erro ao salvar materiais: ' + errorMat.message, 'error');
             }
 
@@ -192,7 +189,7 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
                                         >
                                             <div>
                                                 <div className="font-semibold text-sm text-slate-800">{d.nome}</div>
-                                                <div className="text-[11px] text-gray-500">Doc: {formatarDocumento(d.documento || '', d.tipo_doador)}</div>
+                                                <div className="text-[11px] text-gray-500">Doc: {window.formatarDocumento(d.documento || '', d.tipo_doador)}</div>
                                             </div>
                                         </div>
                                     ))
@@ -229,7 +226,6 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
                     />
                 </div>
 
-                {/* Seleção do Tipo de Doação */}
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Categorias da Doação (Selecione pelo menos uma)</label>
                     <div className="flex flex-wrap gap-6">
@@ -256,7 +252,6 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
                     </div>
                 </div>
 
-                {/* Sub-form Financeiro */}
                 {checkFinanceiro && (
                     <div id="sub-financeiro" className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
                         <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-800 flex items-center gap-2">
@@ -291,14 +286,12 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
                     </div>
                 )}
 
-                {/* Sub-form Material */}
                 {checkMaterial && (
                     <div id="sub-material" className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-4">
                         <h4 className="font-bold text-xs uppercase tracking-wider text-blue-800 flex items-center gap-2">
                             <i data-lucide="package" className="w-4 h-4 text-blue-600"></i> Dados dos Materiais Doados
                         </h4>
 
-                        {/* Presets */}
                         <div>
                             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Atalhos / Presets de Conteúdo</label>
                             <div className="flex flex-wrap gap-2">
@@ -416,3 +409,5 @@ export function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegist
         </div>
     );
 }
+
+window.DoacaoMistaTab = DoacaoMistaTab;

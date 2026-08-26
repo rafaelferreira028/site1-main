@@ -2,7 +2,7 @@ const { createContext, useContext, useState, useEffect } = React;
 
 const ThemeContext = createContext();
 
-export function ThemeProvider({ children, onShowToast }) {
+function ThemeProvider({ children, onShowToast }) {
     const [theme, setThemeState] = useState(() => localStorage.getItem('site-theme') || 'light');
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -61,6 +61,9 @@ export function ThemeProvider({ children, onShowToast }) {
     );
 }
 
-export function useTheme() {
+function useTheme() {
     return useContext(ThemeContext);
 }
+
+window.ThemeProvider = ThemeProvider;
+window.useTheme = useTheme;

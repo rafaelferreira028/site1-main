@@ -2,7 +2,7 @@ const { createContext, useContext, useState } = React;
 
 const ToastContext = createContext();
 
-export function ToastProvider({ children }) {
+function ToastProvider({ children }) {
     const [toasts, setToasts] = useState([]);
 
     const mostrarToast = (mensagem, tipo = 'success') => {
@@ -30,6 +30,9 @@ export function ToastProvider({ children }) {
     );
 }
 
-export function useToast() {
+function useToast() {
     return useContext(ToastContext);
 }
+
+window.ToastProvider = ToastProvider;
+window.useToast = useToast;

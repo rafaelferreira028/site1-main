@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rede de Combate ao Câncer - Sistema de Doações e Estoque</title>
-    
+
     <!-- Design System & Estilos Globais -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="./styles/main.css">
@@ -16,13 +16,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
-    <!-- React 18 & Babel Standalone para Arquitetura Modular de Componentes -->
+    <!-- React 18 & Babel Standalone (Compilação em Memória sem CORS local) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script>
-        // Prevenção instantânea de flash de cor no carregamento
+        // Execução instantânea para evitar flash branco no carregamento
         (function () {
             const savedTheme = localStorage.getItem('site-theme') || 'light';
             document.documentElement.classList.add('theme-' + savedTheme);
@@ -34,10 +34,1286 @@
     <!-- Ponto de Montagem do App React -->
     <div id="root"></div>
 
-    <!-- Carregador Modular React ES6/JSX -->
-    <script type="text/babel" data-type="module">
-        import { App } from './src/App.jsx';
+    <!-- Módulos da Aplicação React -->
+    <script type="text/babel">
+        // ==========================================
+        // 1. CONFIGURAÇÃO E UTILS
+        // ==========================================
+        const SUPABASE_URL = "https://bevvvsghutwpnexuczda.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_CaMU6q53y-n9p0PXW4F1Ow_bgYrD9Mm";
+        const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
+        function formatarCPF(val) {
+            if (!val) return "";
+            val = val.replace(/\D/g, "").slice(0, 11);
+            return val
+                .replace(/^(\d{3})(\d)/, "$1.$2")
+                .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+                .replace(/\.(\d{3})(\d)/, ".$1-$2");
+        }
+
+        function formatarCNPJ(val) {
+            if (!val) return "";
+            val = val.replace(/\D/g, "").slice(0, 14);
+            return val
+                .replace(/^(\d{2})(\d)/, "$1.$2")
+                .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+                .replace(/\.(\d{3})(\d)/, ".$1/$2")
+                .replace(/(\d{4})(\d)/, "$1-$2");
+        }
+
+        function formatarDocumento(val, tipo) {
+            if (!val) return "";
+            if (tipo === 'PF') return formatarCPF(val);
+            if (tipo === 'PJ') return formatarCNPJ(val);
+            const clean = val.replace(/\D/g, "");
+            return clean.length > 11 ? formatarCNPJ(clean) : formatarCPF(clean);
+        }
+
+        function formatarTelefone(val) {
+            if (!val) return "";
+            val = val.replace(/\D/g, "").slice(0, 11);
+            if (val.length > 10) {
+                return val.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+            } else {
+                return val.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+            }
+        }
+
+        function formatarMoeda(valor) {
+            const num = parseFloat(valor || 0);
+            return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatarDataBR(dataIso) {
+            if (!dataIso) return '-';
+            const partes = dataIso.split('-');
+            if (partes.length === 3) {
+                return `${partes[2].padStart(2, '0')}/${partes[1].padStart(2, '0')}/${partes[0].slice(0, 4)}`;
+            }
+            return dataIso;
+        }
+
+        // ==========================================
+        // 2. SERVIÇOS BANCO DE DADOS E RELATÓRIOS
+        // ==========================================
+        const authService = {
+            verificarSessaoSupabase: async () => {
+                if (!supabaseClient) return { session: null };
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                return { session };
+            },
+            realizarLoginSupabase: async (email, password) => {
+                if (!supabaseClient) throw new Error("Supabase não configurado");
+                return await supabaseClient.auth.signInWithPassword({ email, password });
+            },
+            realizarLogoutSupabase: async () => {
+                if (!supabaseClient) return;
+                return await supabaseClient.auth.signOut();
+            }
+        };
+
+        const doadoresService = {
+            buscarDoadores: async () => {
+                if (!supabaseClient) return { data: [], error: null };
+                return await supabaseClient.from('doadores').select('id_doador, nome, tipo_doador, documento, telefone, email, cidade, data_nascimento').order('nome');
+            },
+            buscarDoadoresTodos: async () => {
+                if (!supabaseClient) return { data: [], error: null };
+                return await supabaseClient.from('doadores').select('*').order('nome');
+            },
+            criarDoador: async (dadosDoador) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                return await supabaseClient.from('doadores').insert([dadosDoador]).select();
+            },
+            atualizarDoador: async (idDoador, dadosDoador) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                return await supabaseClient.from('doadores').update(dadosDoador).eq('id_doador', idDoador);
+            },
+            deletarDoadorCascata: async (idDoador) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                const { data: listDoacoes, error: errList } = await supabaseClient.from('doacoes').select('id_doacao').eq('id_doador', idDoador);
+                if (errList) throw errList;
+                if (listDoacoes && listDoacoes.length > 0) {
+                    const idsDoacoes = listDoacoes.map(d => d.id_doacao);
+                    await supabaseClient.from('doacoes_financeiras').delete().in('id_doacao', idsDoacoes);
+                    await supabaseClient.from('doacoes_materiais').delete().in('id_doacao', idsDoacoes);
+                    await supabaseClient.from('doacoes').delete().in('id_doacao', idsDoacoes);
+                }
+                return await supabaseClient.from('doadores').delete().eq('id_doador', idDoador);
+            }
+        };
+
+        const doacoesService = {
+            buscarCategoriasItens: async () => {
+                if (!supabaseClient) return { data: [], error: null };
+                return await supabaseClient.from('categorias_itens').select('id_categoria, nome_categoria').order('id_categoria');
+            },
+            criarEventoDoacao: async (dadosDoacao) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                return await supabaseClient.from('doacoes').insert([dadosDoacao]).select();
+            },
+            criarDoacaoFinanceira: async (dadosFin) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                return await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+            },
+            criarDoacaoMaterial: async (dadosMat) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                return await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+            },
+            buscarDoacoesAdmin: async () => {
+                if (!supabaseClient) return { data: [], error: null };
+                const { data, error } = await supabaseClient
+                    .from('doacoes')
+                    .select('*, doadores(nome), doacoes_financeiras(*), doacoes_materiais(*)')
+                    .order('data_doacao', { ascending: false });
+
+                if (error) return { data: [], error };
+                const listaNormalizada = (data || []).map(d => {
+                    if (d.canal_recebimento === 'Conta Bancária' || d.canal_recebimento === 'Cofrinho' || d.canal_recebimento === 'Bazar') {
+                        d.canal_recebimento = 'Dinheiro';
+                    }
+                    return d;
+                });
+                return { data: listaNormalizada, error: null };
+            },
+            deletarDoacaoCompleta: async (idDoacao) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+                await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+                return await supabaseClient.from('doacoes').delete().eq('id_doacao', idDoacao);
+            },
+            atualizarDoacaoCompleta: async (idDoacao, dadosPai, dadosFin, dadosMat, editHasFin, editHasMat, originalDoacao) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                await supabaseClient.from('doacoes').update(dadosPai).eq('id_doacao', idDoacao);
+                if (editHasFin) {
+                    const originallyHadFin = originalDoacao && originalDoacao.doacoes_financeiras && originalDoacao.doacoes_financeiras.length > 0;
+                    if (originallyHadFin) {
+                        await supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
+                    } else {
+                        await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                    }
+                } else {
+                    await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+                }
+                if (editHasMat) {
+                    const originallyHadMat = originalDoacao && originalDoacao.doacoes_materiais && originalDoacao.doacoes_materiais.length > 0;
+                    if (originallyHadMat) {
+                        await supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
+                    } else {
+                        await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                    }
+                } else {
+                    await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+                }
+                return true;
+            }
+        };
+
+        const estoqueService = {
+            buscarEstoqueMateriais: async () => {
+                if (!supabaseClient) return { data: [], error: null };
+                const { data: matData, error } = await supabaseClient
+                    .from('doacoes_materiais')
+                    .select('*, categorias_itens(nome_categoria), doacoes(data_doacao, canal_recebimento, observacoes)')
+                    .order('id_material', { ascending: false });
+
+                if (error) return { data: [], error };
+                const listaNormalizada = (matData || []).map(m => {
+                    if (m.doacoes && (m.doacoes.canal_recebimento === 'Conta Bancária' || m.doacoes.canal_recebimento === 'Cofrinho' || m.doacoes.canal_recebimento === 'Bazar')) {
+                        m.doacoes.canal_recebimento = 'Dinheiro';
+                    }
+                    return m;
+                });
+                return { data: listaNormalizada, error: null };
+            },
+            buscarEstoqueDoacoesCanais: async () => {
+                if (!supabaseClient) return { data: [], error: null };
+                const { data: doaData, error } = await supabaseClient
+                    .from('doacoes')
+                    .select('*, doacoes_financeiras(*), doacoes_materiais(*, categorias_itens(nome_categoria)))')
+                    .order('data_doacao', { ascending: false });
+
+                if (error) return { data: [], error };
+                const listaNormalizada = (doaData || []).map(d => {
+                    if (d.canal_recebimento === 'Conta Bancária' || d.canal_recebimento === 'Cofrinho' || d.canal_recebimento === 'Bazar') {
+                        d.canal_recebimento = 'Dinheiro';
+                    }
+                    return d;
+                });
+                return { data: listaNormalizada, error: null };
+            },
+            atualizarItemEstoqueLote: async (idMaterial, dadosItem) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                return await supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
+            },
+            atualizarEstoqueConsolidado: async (lotes, diferenca, novosDados) => {
+                if (!supabaseClient) throw new Error("Supabase não disponível");
+                const updatePromises = lotes.map((lote, index) => {
+                    let qtdLote = lote.quantidade;
+                    if (index === 0) qtdLote = Math.max(0, lote.quantidade + diferenca);
+                    return supabaseClient.from('doacoes_materiais').update({ ...novosDados, quantidade: qtdLote }).eq('id_material', lote.id_material);
+                });
+                await Promise.all(updatePromises);
+                return true;
+            }
+        };
+
+        const pdfService = {
+            exportarPDFEstoqueOficial: async () => {
+                if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("jsPDF não disponível");
+                const { data: matData, error } = await supabaseClient.from('doacoes_materiais').select('*, categorias_itens(nome_categoria)').order('id_categoria', { ascending: true });
+                if (error) throw error;
+                const materiais = matData || [];
+                if (materiais.length === 0) return { success: false, message: "Não há itens em estoque para gerar PDF." };
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const agora = new Date();
+                const dataFormatada = agora.toLocaleDateString('pt-BR');
+                const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                doc.setFillColor(225, 29, 72);
+                doc.rect(0, 0, 297, 24, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(16);
+                doc.text("REDE DE COMBATE AO CÂNCER DE CATANDUVA", 14, 12);
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(10);
+                doc.text("RELATÓRIO OFICIAL DE ITENS E MATERIAIS EM ESTOQUE", 14, 18);
+                doc.setFontSize(9);
+                doc.text(`Gerado em: ${dataFormatada} às ${horaFormatada}`, 283, 15, { align: 'right' });
+
+                const totalItens = materiais.reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+                const totalBazar = materiais.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+                const totalAlimentos = materiais.filter(m => m.id_categoria === 2).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+                const totalHigiene = materiais.filter(m => m.id_categoria === 3).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+
+                doc.setFillColor(248, 250, 252);
+                doc.setDrawColor(226, 232, 240);
+                doc.roundedRect(14, 28, 269, 14, 2, 2, 'FD');
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(51, 65, 85);
+                doc.text(`TOTAL GERAL: ${totalItens} itens`, 20, 36.5);
+                doc.text(`BAZAR: ${totalBazar} un.`, 90, 36.5);
+                doc.text(`ALIMENTOS: ${totalAlimentos} un.`, 150, 36.5);
+                doc.text(`HIGIENE: ${totalHigiene} un.`, 220, 36.5);
+
+                const grupos = {};
+                materiais.forEach(item => {
+                    const catNome = item.categorias_itens ? item.categorias_itens.nome_categoria : 'Geral';
+                    const key = `${item.descricao_item.trim().toLowerCase()}_${catNome.toLowerCase()}_${item.destino_item.toLowerCase()}_${item.unidade_medida.toLowerCase()}`;
+                    if (!grupos[key]) {
+                        grupos[key] = {
+                            descricao: item.descricao_item,
+                            categoria: catNome,
+                            quantidade: 0,
+                            unidade: item.unidade_medida,
+                            estado: item.estado_conservacao || 'Não se aplica',
+                            destino: item.destino_item
+                        };
+                    }
+                    grupos[key].quantidade += parseInt(item.quantidade || 0);
+                });
+
+                const tableRows = Object.values(grupos).map((g, index) => [
+                    index + 1, g.descricao, g.categoria, g.quantidade, g.unidade, g.estado, g.destino
+                ]);
+
+                doc.autoTable({
+                    startY: 46,
+                    head: [['#', 'Descrição do Item / Material', 'Categoria', 'Qtd Disponível', 'Unidade', 'Estado Conservação', 'Destino Atual']],
+                    body: tableRows,
+                    theme: 'striped',
+                    headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
+                    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 85, fontStyle: 'bold' }, 2: { cellWidth: 50 }, 3: { cellWidth: 30, halign: 'center', fontStyle: 'bold' }, 4: { cellWidth: 25 }, 5: { cellWidth: 34 }, 6: { cellWidth: 35 } },
+                    bodyStyles: { fontSize: 8.5, textColor: [30, 41, 59] },
+                    alternateRowStyles: { fillColor: [252, 252, 253] },
+                    margin: { left: 14, right: 14 },
+                    didDrawPage: function (data) {
+                        const pageCount = doc.internal.getNumberOfPages();
+                        doc.setFontSize(8);
+                        doc.setTextColor(148, 163, 184);
+                        doc.text(`Página ${data.pageNumber} de ${pageCount}`, 283, 202, { align: 'right' });
+                        doc.text(`Rede de Combate ao Câncer - Sistema de Gestão de Doações e Estoque`, 14, 202);
+                    }
+                });
+
+                const nomeArquivo = `Relatorio_Estoque_RedeCombateCancer_${dataFormatada.replace(/\//g, '-')}.pdf`;
+                doc.save(nomeArquivo);
+                return { success: true, filename: nomeArquivo };
+            }
+        };
+
+        // ==========================================
+        // 3. REACT CONTEXT PROVIDERS
+        // ==========================================
+        const { createContext, useContext, useState, useEffect } = React;
+
+        const AuthContext = createContext();
+        function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
+            const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem('app_autenticado') === 'true');
+            const [session, setSession] = useState(null);
+
+            const checkAuth = async () => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const { session: sess } = await authService.verificarSessaoSupabase();
+                    setSession(sess);
+                    if (sess || sessionStorage.getItem('app_autenticado') === 'true') {
+                        sessionStorage.setItem('app_autenticado', 'true');
+                        setAuthenticated(true);
+                    } else {
+                        setAuthenticated(false);
+                    }
+                } catch (e) {
+                    console.error("Erro na checagem de autenticação:", e);
+                } finally {
+                    if (onLoadingEnd) onLoadingEnd();
+                }
+            };
+
+            useEffect(() => { checkAuth(); }, []);
+
+            const login = async (email, password) => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const { data, error } = await authService.realizarLoginSupabase(email, password);
+                    if (error) throw error;
+                    sessionStorage.setItem('app_autenticado', 'true');
+                    setAuthenticated(true);
+                    setSession(data ? data.session : null);
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error };
+                } finally {
+                    if (onLoadingEnd) onLoadingEnd();
+                }
+            };
+
+            const logout = async () => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    await authService.realizarLogoutSupabase();
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    sessionStorage.removeItem('app_autenticado');
+                    setAuthenticated(false);
+                    setSession(null);
+                    if (onLoadingEnd) onLoadingEnd();
+                }
+            };
+
+            return (
+                <AuthContext.Provider value={{ authenticated, session, login, logout, checkAuth }}>
+                    {children}
+                </AuthContext.Provider>
+            );
+        }
+        function useAuth() { return useContext(AuthContext); }
+
+        const ThemeContext = createContext();
+        function ThemeProvider({ children, onShowToast }) {
+            const [theme, setThemeState] = useState(() => localStorage.getItem('site-theme') || 'light');
+            const [menuOpen, setMenuOpen] = useState(false);
+
+            const applyTheme = (newTheme) => {
+                setThemeState(newTheme);
+                localStorage.setItem('site-theme', newTheme);
+                document.body.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
+                document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
+                document.body.classList.add('theme-' + newTheme);
+                document.documentElement.classList.add('theme-' + newTheme);
+            };
+
+            useEffect(() => { applyTheme(theme); }, []);
+
+            const changeTheme = (newTheme) => {
+                applyTheme(newTheme);
+                setMenuOpen(false);
+                if (onShowToast) {
+                    if (newTheme === 'ultra-dark') onShowToast('Modo Visão Sensível (Baixa Luminosidade) ativado!', 'info');
+                    else if (newTheme === 'dark') onShowToast('Modo Escuro Padrão ativado!', 'info');
+                    else onShowToast('Modo Claro Padrão ativado!', 'info');
+                }
+            };
+
+            const toggleMenu = (e) => {
+                if (e) e.stopPropagation();
+                setMenuOpen(prev => !prev);
+            };
+
+            useEffect(() => {
+                const handleOutsideClick = (e) => {
+                    if (!e.target.closest('.theme-selector-container')) setMenuOpen(false);
+                };
+                document.addEventListener('click', handleOutsideClick);
+                return () => document.removeEventListener('click', handleOutsideClick);
+            }, []);
+
+            return (
+                <ThemeContext.Provider value={{ theme, changeTheme, menuOpen, toggleMenu }}>
+                    {children}
+                </ThemeContext.Provider>
+            );
+        }
+        function useTheme() { return useContext(ThemeContext); }
+
+        const ToastContext = createContext();
+        function ToastProvider({ children }) {
+            const [toasts, setToasts] = useState([]);
+
+            const mostrarToast = (mensagem, tipo = 'success') => {
+                const id = Date.now() + Math.random();
+                const newToast = { id, mensagem, tipo, isExiting: false };
+                setToasts(prev => [...prev, newToast]);
+                setTimeout(() => removerToast(id), 4000);
+            };
+
+            const removerToast = (id) => {
+                setToasts(prev => prev.map(t => t.id === id ? { ...t, isExiting: true } : t));
+                setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 300);
+            };
+
+            return (
+                <ToastContext.Provider value={{ toasts, mostrarToast, removerToast }}>
+                    {children}
+                </ToastContext.Provider>
+            );
+        }
+        function useToast() { return useContext(ToastContext); }
+
+        // ==========================================
+        // 4. COMPONENTES UI COMUNS
+        // ==========================================
+        function ProgressBar({ width, opacity }) {
+            return (
+                <div id="global-progress-bar" style={{ width: `${width}%`, opacity: opacity }} />
+            );
+        }
+
+        function ToastContainer() {
+            const { toasts, removerToast } = useToast();
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [toasts]);
+
+            return (
+                <div id="toast-container" className="fixed top-5 right-5 z-50 flex flex-col gap-2.5 pointer-events-none">
+                    {toasts.map(toast => {
+                        let bgClass = toast.tipo === 'success' ? 'bg-emerald-50/95 border-emerald-150 text-emerald-800 shadow-emerald-500/5' :
+                            toast.tipo === 'error' ? 'bg-rose-50/95 border-rose-150 text-rose-800 shadow-rose-500/5' :
+                                'bg-blue-50/95 border-blue-150 text-blue-800 shadow-blue-500/5';
+                        let iconName = toast.tipo === 'success' ? 'check-circle-2' : toast.tipo === 'error' ? 'alert-circle' : 'info';
+
+                        return (
+                            <div
+                                key={toast.id}
+                                onClick={() => removerToast(toast.id)}
+                                className={`toast-item p-4 rounded-xl shadow-lg border backdrop-blur-md flex items-center gap-3 transition-all duration-300 pointer-events-auto cursor-pointer max-w-sm w-full ${bgClass}`}
+                                style={{ transform: toast.isExiting ? 'translateY(-12px) scale(0.95)' : 'translateY(0) scale(1)', opacity: toast.isExiting ? 0 : 1 }}
+                            >
+                                <i data-lucide={iconName} className="w-5 h-5 flex-shrink-0"></i>
+                                <span className="text-sm font-semibold">{toast.mensagem}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        function ThemeSelector() {
+            const { theme, changeTheme, menuOpen, toggleMenu } = useTheme();
+            const labels = { 'light': 'Modo Claro', 'dark': 'Modo Escuro', 'ultra-dark': 'Visão Sensível' };
+            const icons = { 'light': 'sun', 'dark': 'moon', 'ultra-dark': 'eye' };
+            const iconColors = { 'light': 'text-amber-500', 'dark': 'text-indigo-400', 'ultra-dark': 'text-rose-500' };
+
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [theme, menuOpen]);
+
+            return (
+                <div className="relative inline-block text-left theme-selector-container">
+                    <button
+                        type="button"
+                        onClick={toggleMenu}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 bg-white/80 backdrop-blur-xs text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none transition cursor-pointer shadow-2xs"
+                    >
+                        <div className="theme-btn-icon-container">
+                            <i data-lucide={icons[theme] || 'eye'} className={`w-4 h-4 ${iconColors[theme] || 'text-rose-500'}`}></i>
+                        </div>
+                        <span className="theme-btn-label">{labels[theme] || 'Visão Sensível'}</span>
+                        <i data-lucide="chevron-down" className="w-3.5 h-3.5 text-gray-400"></i>
+                    </button>
+
+                    {menuOpen && (
+                        <div className="theme-dropdown-menu absolute right-0 mt-2 w-48 rounded-2xl bg-white shadow-xl border border-gray-100 py-1.5 z-50 transition-all duration-200">
+                            <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50">Acessibilidade Visual</div>
+                            <button onClick={() => changeTheme('light')} className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-rose-50/60 transition cursor-pointer ${theme === 'light' ? 'font-bold text-rose-600' : 'text-gray-700'}`}>
+                                <div className="flex items-center gap-2"><i data-lucide="sun" className="w-4 h-4 text-amber-500"></i><span>Modo Claro (Padrão)</span></div>
+                                {theme === 'light' && <i data-lucide="check" className="w-3.5 h-3.5 text-rose-600"></i>}
+                            </button>
+                            <button onClick={() => changeTheme('dark')} className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-rose-50/60 transition cursor-pointer ${theme === 'dark' ? 'font-bold text-rose-600' : 'text-gray-700'}`}>
+                                <div className="flex items-center gap-2"><i data-lucide="moon" className="w-4 h-4 text-indigo-400"></i><span>Modo Escuro</span></div>
+                                {theme === 'dark' && <i data-lucide="check" className="w-3.5 h-3.5 text-rose-600"></i>}
+                            </button>
+                            <button onClick={() => changeTheme('ultra-dark')} className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-rose-50/60 transition cursor-pointer ${theme === 'ultra-dark' ? 'font-bold text-rose-600' : 'text-gray-700'}`}>
+                                <div className="flex items-center gap-2"><i data-lucide="eye" className="w-4 h-4 text-rose-500"></i><span>Visão Sensível (Baixo Brilho)</span></div>
+                                {theme === 'ultra-dark' && <i data-lucide="check" className="w-3.5 h-3.5 text-rose-600"></i>}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function Header() {
+            const { logout } = useAuth();
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, []);
+
+            return (
+                <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-rose-600 text-white p-2.5 rounded-2xl shadow-sm"><i data-lucide="heart-handshake" className="w-7 h-7"></i></div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Rede de Combate ao Câncer</h1>
+                            <p className="text-xs font-medium text-gray-500">Sistema Institucional de Gestão de Doações e Estoque</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <ThemeSelector />
+                        <button id="btn-global-logout" onClick={logout} className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:bg-rose-600 hover:text-white transition duration-150 focus:outline-none cursor-pointer flex items-center gap-1.5" title="Sair do Sistema">
+                            <i data-lucide="log-out" className="w-4 h-4"></i><span>Sair</span>
+                        </button>
+                        <div className="hidden md:flex items-center gap-2 bg-rose-50/60 border border-rose-100 px-3.5 py-1.5 rounded-full text-rose-700 font-semibold text-xs">
+                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span><span>Ambiente Seguro</span>
+                        </div>
+                    </div>
+                </header>
+            );
+        }
+
+        function Navbar({ activeTab, onSwitchTab }) {
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [activeTab]);
+            const tabs = [
+                { id: 'doador', label: 'Cadastrar Doador', icon: 'user-plus' },
+                { id: 'doacao_mista', label: 'Registrar Doação (Mista)', icon: 'gift' },
+                { id: 'admin', label: 'Painel Admin & Relatórios', icon: 'layout-dashboard' },
+                { id: 'estoque', label: 'Controle de Estoque', icon: 'boxes' }
+            ];
+
+            return (
+                <nav className="flex flex-wrap gap-2 pt-4">
+                    {tabs.map(tab => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                id={`btn-${tab.id}`}
+                                onClick={() => onSwitchTab(tab.id)}
+                                className={`tab-btn px-5 py-2.5 text-sm font-medium rounded-xl transition duration-150 focus:outline-none flex items-center gap-2 cursor-pointer ${isActive ? 'bg-rose-50 text-rose-600 shadow-sm border border-rose-100 font-semibold' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 bg-transparent border border-transparent'}`}
+                            >
+                                <i data-lucide={tab.icon} className="w-4 h-4"></i>{tab.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+            );
+        }
+
+        // ==========================================
+        // 5. COMPONENTES MODAIS
+        // ==========================================
+        function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
+            const [idDoador, setIdDoador] = useState('');
+            const [nome, setNome] = useState('');
+            const [tipoDoador, setTipoDoador] = useState('PF');
+            const [documento, setDocumento] = useState('');
+            const [telefone, setTelefone] = useState('');
+            const [email, setEmail] = useState('');
+            const [cidade, setCidade] = useState('');
+            const [dataNascimento, setDataNascimento] = useState('');
+
+            useEffect(() => {
+                if (doador) {
+                    setIdDoador(doador.id_doador || '');
+                    setNome(doador.nome || '');
+                    setTipoDoador(doador.tipo_doador || 'PF');
+                    setDocumento(formatarDocumento(doador.documento || '', doador.tipo_doador || 'PF'));
+                    setTelefone(formatarTelefone(doador.telefone || ''));
+                    setEmail(doador.email || '');
+                    setCidade(doador.cidade || '');
+                    setDataNascimento(doador.data_nascimento || '');
+                }
+            }, [doador]);
+
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isOpen, tipoDoador]);
+
+            if (!isOpen) return null;
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave({ id_doador: parseInt(idDoador), nome, tipo_doador: tipoDoador, documento: documento || null, telefone: telefone || null, email: email || null, cidade: cidade || null, data_nascimento: dataNascimento || null });
+            };
+
+            return (
+                <div id="modal-editar-doador" className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay show bg-slate-900/40 backdrop-blur-xs">
+                    <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 modal-dialog show relative overflow-hidden">
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+                            <div className="flex items-center gap-2"><div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><i data-lucide="user-cog" className="w-5 h-5"></i></div><h3 className="text-lg font-bold text-slate-800">Editar Cadastro de Doador</h3></div>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition"><i data-lucide="x" className="w-5 h-5"></i></button>
+                        </div>
+                        <form id="form-editar-doador" onSubmit={handleSubmit} className="space-y-4">
+                            <input type="hidden" value={idDoador} />
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nome Completo / Razão Social *</label><input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Tipo de Doador *</label>
+                                    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200/80 h-[42px] items-center">
+                                        <button type="button" onClick={() => { setTipoDoador('PF'); setDocumento(formatarDocumento(documento, 'PF')); }} className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PF' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="user" className="w-4 h-4"></i> PF</button>
+                                        <button type="button" onClick={() => { setTipoDoador('PJ'); setDocumento(formatarDocumento(documento, 'PJ')); }} className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PJ' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="building-2" className="w-4 h-4"></i> PJ</button>
+                                    </div>
+                                </div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">{tipoDoador === 'PF' ? 'CPF *' : 'CNPJ *'}</label><input type="text" value={documento} onChange={(e) => setDocumento(formatarDocumento(e.target.value, tipoDoador))} maxLength={tipoDoador === 'PF' ? 14 : 18} placeholder={tipoDoador === 'PF' ? "000.000.000-00" : "00.000.000/0000-00"} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500 font-mono" /></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Telefone</label><input type="tel" value={telefone} onChange={(e) => setTelefone(formatarTelefone(e.target.value))} maxLength={15} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Cidade / UF</label><input type="text" value={cidade} onChange={(e) => setCidade(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Data Nasc./Fund.</label><input type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                            </div>
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                                <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold rounded-xl text-gray-600 hover:bg-gray-100 transition cursor-pointer">Cancelar</button>
+                                <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md cursor-pointer flex items-center gap-2"><i data-lucide="check" className="w-4 h-4"></i> Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave }) {
+            const [idDoacao, setIdDoacao] = useState('');
+            const [idDoador, setIdDoador] = useState('');
+            const [doadorSearchQuery, setDoadorSearchQuery] = useState('');
+            const [dropdownOpen, setDropdownOpen] = useState(false);
+            const [canal, setCanal] = useState('Presencial');
+            const [observacoes, setObservacoes] = useState('');
+            const [checkFinanceiro, setCheckFinanceiro] = useState(false);
+            const [finValor, setFinValor] = useState('');
+            const [finComprovante, setFinComprovante] = useState('');
+            const [checkMaterial, setCheckMaterial] = useState(false);
+            const [matDescricao, setMatDescricao] = useState('');
+            const [matCategoria, setMatCategoria] = useState('');
+            const [matQtd, setMatQtd] = useState(1);
+            const [matUnidade, setMatUnidade] = useState('Unidade');
+            const [matEstado, setMatEstado] = useState('Não se aplica');
+            const [matDestino, setMatDestino] = useState('Estoque Geral');
+
+            useEffect(() => {
+                if (doacao) {
+                    setIdDoacao(doacao.id_doacao || '');
+                    setIdDoador(doacao.id_doador || '');
+                    const doadorObj = doadores.find(d => d.id_doador === doacao.id_doador);
+                    setDoadorSearchQuery(doadorObj ? doadorObj.nome : (doacao.doadores ? doacao.doadores.nome : ''));
+                    setCanal(doacao.canal_recebimento || 'Presencial');
+                    setObservacoes(doacao.observacoes || '');
+
+                    const hasFin = doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0;
+                    setCheckFinanceiro(hasFin);
+                    if (hasFin) {
+                        const fin = doacao.doacoes_financeiras[0];
+                        setFinValor(fin.valor || '');
+                        setFinComprovante(fin.comprovante_transacao || '');
+                    } else { setFinValor(''); setFinComprovante(''); }
+
+                    const hasMat = doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0;
+                    setCheckMaterial(hasMat);
+                    if (hasMat) {
+                        const mat = doacao.doacoes_materiais[0];
+                        setMatDescricao(mat.descricao_item || '');
+                        setMatCategoria(mat.id_categoria || (categorias[0] ? categorias[0].id_categoria : ''));
+                        setMatQtd(mat.quantidade || 1);
+                        setMatUnidade(mat.unidade_medida || 'Unidade');
+                        setMatEstado(mat.estado_conservacao || 'Não se aplica');
+                        setMatDestino(mat.destino_item || 'Estoque Geral');
+                    } else {
+                        setMatDescricao('');
+                        setMatCategoria(categorias[0] ? categorias[0].id_categoria : '');
+                        setMatQtd(1); setMatUnidade('Unidade'); setMatEstado('Não se aplica'); setMatDestino('Estoque Geral');
+                    }
+                }
+            }, [doacao, doadores, categorias]);
+
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isOpen, checkFinanceiro, checkMaterial, dropdownOpen]);
+
+            if (!isOpen) return null;
+
+            const doadoresFiltrados = doadores.filter(d => {
+                const q = doadorSearchQuery.toLowerCase().trim();
+                return !q || d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q));
+            });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave({
+                    idDoacao: parseInt(idDoacao), idDoador: parseInt(idDoador), canal, observacoes, checkFinanceiro, checkMaterial,
+                    finValor: parseFloat(finValor), finComprovante, matDescricao, matCategoria: parseInt(matCategoria),
+                    matQtd: parseInt(matQtd), matUnidade, matEstado, matDestino
+                });
+            };
+
+            return (
+                <div id="modal-editar-doacao" className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay show bg-slate-900/40 backdrop-blur-xs">
+                    <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 modal-dialog show relative overflow-hidden max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100 sticky top-0 bg-white z-20">
+                            <div className="flex items-center gap-2"><div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><i data-lucide="edit-3" className="w-5 h-5"></i></div><h3 className="text-lg font-bold text-slate-800">Editar Registro de Doação</h3></div>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition"><i data-lucide="x" className="w-5 h-5"></i></button>
+                        </div>
+                        <form id="form-editar-doacao" onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="relative">
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Doador Vinculado *</label>
+                                    <input type="text" value={doadorSearchQuery} onChange={(e) => { setDoadorSearchQuery(e.target.value); setDropdownOpen(true); }} onFocus={() => setDropdownOpen(true)} className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm ${idDoador ? 'bg-rose-50/50 border-rose-300 font-semibold' : ''}`} />
+                                    {dropdownOpen && (
+                                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
+                                            {doadoresFiltrados.map(d => (
+                                                <div key={d.id_doador} onMouseDown={() => { setIdDoador(d.id_doador); setDoadorSearchQuery(d.nome); setDropdownOpen(false); }} className="p-3 hover:bg-rose-50 cursor-pointer border-b border-gray-50 text-sm font-semibold">{d.nome}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Canal *</label>
+                                    <select value={canal} onChange={(e) => setCanal(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">
+                                        <option value="Presencial">Presencial (Sede)</option>
+                                        <option value="PIX">PIX / Banco</option>
+                                        <option value="Dinheiro">Dinheiro / Bazar</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-gray-50 rounded-2xl flex gap-6">
+                                <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkFinanceiro} onChange={(e) => setCheckFinanceiro(e.target.checked)} className="accent-rose-600" /> Financeira</label>
+                                <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkMaterial} onChange={(e) => setCheckMaterial(e.target.checked)} className="accent-rose-600" /> Material</label>
+                            </div>
+                            {checkFinanceiro && (
+                                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label><input type="number" step="0.01" value={finValor} onChange={(e) => setFinValor(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nº Comprovante</label><input type="text" value={finComprovante} onChange={(e) => setFinComprovante(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                </div>
+                            )}
+                            {checkMaterial && (
+                                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={matDescricao} onChange={(e) => setMatDescricao(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={matCategoria} onChange={(e) => setMatCategoria(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd *</label><input type="number" min="1" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={matDestino} onChange={(e) => setMatDestino(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                                <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-gray-600">Cancelar</button>
+                                <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, onSave }) {
+            const [idMaterial, setIdMaterial] = useState('');
+            const [descricao, setDescricao] = useState('');
+            const [categoria, setCategoria] = useState('');
+            const [quantidade, setQuantidade] = useState(1);
+            const [unidade, setUnidade] = useState('Unidade');
+            const [estado, setEstado] = useState('Novo');
+            const [destino, setDestino] = useState('Estoque Geral');
+
+            useEffect(() => {
+                if (item) {
+                    setIdMaterial(item.id_material || '');
+                    setDescricao(modo === 'consolidado' ? item.descricao : (item.descricao_item || ''));
+                    setCategoria(item.id_categoria || (categorias[0] ? categorias[0].id_categoria : ''));
+                    setQuantidade(modo === 'consolidado' ? item.quantidadeTotal : (item.quantidade || 1));
+                    setUnidade(item.unidade || item.unidade_medida || 'Unidade');
+                    setEstado(item.estado || item.estado_conservacao || 'Novo');
+                    setDestino(item.destino || item.destino_item || 'Estoque Geral');
+                }
+            }, [item, modo, categorias]);
+
+            if (!isOpen) return null;
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave({ idMaterial: parseInt(idMaterial), modo, grupoKey, novaDesc: descricao, novaCat: parseInt(categoria), novaQtd: parseInt(quantidade), novaUnidade: unidade, novoEstado: estado, novoDestino: destino });
+            };
+
+            return (
+                <div id="modal-editar-estoque" className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay show bg-slate-900/40 backdrop-blur-xs">
+                    <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 modal-dialog show relative overflow-hidden">
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+                            <div className="flex items-center gap-2"><div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><i data-lucide="package-search" className="w-5 h-5"></i></div><h3 className="text-lg font-bold text-slate-800">Editar Item no Estoque</h3></div>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition"><i data-lucide="x" className="w-5 h-5"></i></button>
+                        </div>
+                        <form id="form-editar-estoque" onSubmit={handleSubmit} className="space-y-4">
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd Total *</label><input type="number" min="0" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade *</label><select value={unidade} onChange={(e) => setUnidade(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Pacote">Pacote (pct)</option></select></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={destino} onChange={(e) => setDestino(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
+                            </div>
+                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                                <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-gray-600">Cancelar</button>
+                                <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 6. ABAS DA APLICAÇÃO
+        // ==========================================
+        function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd }) {
+            const { mostrarToast } = useToast();
+            const [nome, setNome] = useState('');
+            const [tipoDoador, setTipoDoador] = useState('PF');
+            const [documento, setDocumento] = useState('');
+            const [telefone, setTelefone] = useState('');
+            const [email, setEmail] = useState('');
+            const [cidade, setCidade] = useState('');
+            const [dataNascimento, setDataNascimento] = useState('');
+
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, tipoDoador]);
+            if (!isVisible) return null;
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const { error } = await doadoresService.criarDoador({ nome, tipo_doador: tipoDoador, documento: documento || null, telefone: telefone || null, email: email || null, cidade: cidade || null, data_nascimento: dataNascimento || null });
+                    if (error) mostrarToast('Erro ao salvar doador: ' + error.message, 'error');
+                    else {
+                        mostrarToast('Doador cadastrado com sucesso!', 'success');
+                        setNome(''); setDocumento(''); setTelefone(''); setEmail(''); setCidade(''); setDataNascimento('');
+                        if (onDoadorCadastrado) onDoadorCadastrado();
+                    }
+                } catch (err) { mostrarToast('Erro ao salvar doador: ' + err.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            return (
+                <div id="tab-doador" className="tab-content active visible bg-white p-6 rounded-2xl shadow-xs border border-gray-100">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i data-lucide="user-plus" className="text-rose-600"></i> Cadastrar Novo Doador</h2>
+                    <form id="form-doador" onSubmit={handleSubmit} className="space-y-4">
+                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nome Completo / Razão Social *</label><input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required placeholder="Ex: Maria da Silva" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Tipo de Doador *</label>
+                                <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200/80 h-[42px] items-center">
+                                    <button type="button" onClick={() => { setTipoDoador('PF'); setDocumento(formatarDocumento(documento, 'PF')); }} className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PF' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="user" className="w-4 h-4"></i> PF</button>
+                                    <button type="button" onClick={() => { setTipoDoador('PJ'); setDocumento(formatarDocumento(documento, 'PJ')); }} className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PJ' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="building-2" className="w-4 h-4"></i> PJ</button>
+                                </div>
+                            </div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">{tipoDoador === 'PF' ? 'CPF *' : 'CNPJ *'}</label><input type="text" value={documento} onChange={(e) => setDocumento(formatarDocumento(e.target.value, tipoDoador))} maxLength={tipoDoador === 'PF' ? 14 : 18} placeholder={tipoDoador === 'PF' ? "000.000.000-00" : "00.000.000/0000-00"} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Telefone / WhatsApp</label><input type="tel" value={telefone} onChange={(e) => setTelefone(formatarTelefone(e.target.value))} maxLength={15} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Cidade / UF</label><input type="text" value={cidade} onChange={(e) => setCidade(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Data Nasc./Fund.</label><input type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                        </div>
+                        <div className="pt-4 flex justify-end"><button type="submit" className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2"><i data-lucide="save" className="w-5 h-5"></i> Salvar Doador</button></div>
+                    </form>
+                </div>
+            );
+        }
+
+        function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, onLoadingStart, onLoadingEnd }) {
+            const { mostrarToast } = useToast();
+            const [idDoador, setIdDoador] = useState('');
+            const [doadorSearchQuery, setDoadorSearchQuery] = useState('');
+            const [dropdownOpen, setDropdownOpen] = useState(false);
+            const [canal, setCanal] = useState('Presencial');
+            const [observacoes, setObservacoes] = useState('');
+            const [checkFinanceiro, setCheckFinanceiro] = useState(false);
+            const [finValor, setFinValor] = useState('');
+            const [finComprovante, setFinComprovante] = useState('');
+            const [checkMaterial, setCheckMaterial] = useState(false);
+            const [matDescricao, setMatDescricao] = useState('');
+            const [matCategoria, setMatCategoria] = useState('');
+            const [matQtd, setMatQtd] = useState(1);
+            const [matUnidade, setMatUnidade] = useState('Unidade');
+            const [matEstado, setMatEstado] = useState('Não se aplica');
+            const [matDestino, setMatDestino] = useState('Estoque Geral');
+
+            useEffect(() => { if (categorias.length > 0 && !matCategoria) setMatCategoria(categorias[0].id_categoria); }, [categorias]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, checkFinanceiro, checkMaterial, dropdownOpen]);
+            if (!isVisible) return null;
+
+            const doadoresFiltrados = doadores.filter(d => {
+                const q = doadorSearchQuery.toLowerCase().trim();
+                return !q || d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q));
+            });
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!checkFinanceiro && !checkMaterial) { mostrarToast('Marque pelo menos uma opção (Financeira ou Material).', 'error'); return; }
+                if (!idDoador) { mostrarToast('Selecione um doador válido da lista.', 'error'); return; }
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const { data: doacaoCriada, error: errorPai } = await doacoesService.criarEventoDoacao({ id_doador: parseInt(idDoador), canal_recebimento: canal, observacoes: observacoes || null });
+                    if (errorPai) throw errorPai;
+                    const idDoacaoGerado = doacaoCriada[0].id_doacao;
+                    if (checkFinanceiro) await doacoesService.criarDoacaoFinanceira({ id_doacao: idDoacaoGerado, valor: parseFloat(finValor), comprovante_transacao: finComprovante || null });
+                    if (checkMaterial) await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: parseInt(matCategoria), descricao_item: matDescricao, quantidade: parseInt(matQtd), unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
+
+                    mostrarToast('Doação registrada com sucesso!', 'success');
+                    setIdDoador(''); setDoadorSearchQuery(''); setCheckFinanceiro(false); setFinValor(''); setCheckMaterial(false); setMatDescricao('');
+                    if (onDoacaoRegistrada) onDoacaoRegistrada();
+                } catch (err) { mostrarToast('Erro ao criar doação: ' + err.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            return (
+                <div id="tab-doacao_mista" className="tab-content active visible bg-white p-6 rounded-2xl shadow-xs border border-gray-100">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i data-lucide="gift" className="text-rose-600"></i> Registrar Nova Doação (Mista)</h2>
+                    <form id="form-doacao" onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="relative">
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Pesquisar Doador *</label>
+                                <input type="text" value={doadorSearchQuery} onChange={(e) => { setDoadorSearchQuery(e.target.value); setDropdownOpen(true); }} onFocus={() => setDropdownOpen(true)} placeholder="Digite o nome..." className={`w-full px-4 py-2.5 rounded-xl border text-sm ${idDoador ? 'bg-rose-50/50 border-rose-300 font-semibold' : 'border-gray-200'}`} />
+                                {dropdownOpen && (
+                                    <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
+                                        {doadoresFiltrados.map(d => (
+                                            <div key={d.id_doador} onMouseDown={() => { setIdDoador(d.id_doador); setDoadorSearchQuery(d.nome); setDropdownOpen(false); }} className="p-3 hover:bg-rose-50 cursor-pointer border-b border-gray-50 text-sm font-semibold">{d.nome}</div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Canal de Recebimento *</label>
+                                <select value={canal} onChange={(e) => setCanal(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Presencial">Presencial (Sede)</option><option value="PIX">PIX / Banco</option><option value="Dinheiro">Dinheiro / Bazar</option></select>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-2xl flex gap-6">
+                            <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkFinanceiro} onChange={(e) => setCheckFinanceiro(e.target.checked)} className="accent-rose-600" /> 💰 Doação Financeira</label>
+                            <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkMaterial} onChange={(e) => setCheckMaterial(e.target.checked)} className="accent-rose-600" /> 📦 Doação Material</label>
+                        </div>
+                        {checkFinanceiro && (
+                            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label><input type="number" step="0.01" value={finValor} onChange={(e) => setFinValor(e.target.value)} required placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nº Comprovante</label><input type="text" value={finComprovante} onChange={(e) => setFinComprovante(e.target.value)} placeholder="Ex: TX-984" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                            </div>
+                        )}
+                        {checkMaterial && (
+                            <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={matDescricao} onChange={(e) => setMatDescricao(e.target.value)} required placeholder="Ex: Cesta Básica" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={matCategoria} onChange={(e) => setMatCategoria(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Quantidade *</label><input type="number" min="1" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={matDestino} onChange={(e) => setMatDestino(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
+                                </div>
+                            </div>
+                        )}
+                        <div className="pt-4 flex justify-end"><button type="submit" className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2"><i data-lucide="check-circle" className="w-5 h-5"></i> Registrar Doação</button></div>
+                    </form>
+                </div>
+            );
+        }
+
+        function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged, onLoadingStart, onLoadingEnd }) {
+            const { mostrarToast } = useToast();
+            const [adminSubTab, setAdminSubTab] = useState('doadores');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [doadoresList, setDoadoresList] = useState([]);
+            const [doacoesList, setDoacoesList] = useState([]);
+            const [metricDoadores, setMetricDoadores] = useState(0);
+            const [metricDoacoes, setMetricDoacoes] = useState(0);
+            const [metricFinanceiro, setMetricFinanceiro] = useState(0);
+            const [metricMateriais, setMetricMateriais] = useState(0);
+
+            const carregarDadosAdmin = async () => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const { data: dData } = await doadoresService.buscarDoadoresTodos();
+                    setDoadoresList(dData || []);
+                    setMetricDoadores(dData ? dData.length : 0);
+
+                    const { data: doaData } = await doacoesService.buscarDoacoesAdmin();
+                    setDoacoesList(doaData || []);
+                    setMetricDoacoes(doaData ? doaData.length : 0);
+
+                    let totFin = 0; let totMat = 0;
+                    (doaData || []).forEach(d => {
+                        if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) totFin += parseFloat(d.doacoes_financeiras[0].valor || 0);
+                        if (d.doacoes_materiais && d.doacoes_materiais.length > 0) totMat += parseInt(d.doacoes_materiais[0].quantidade || 0);
+                    });
+                    setMetricFinanceiro(totFin);
+                    setMetricMateriais(totMat);
+                } catch (e) { console.error(e); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            useEffect(() => { if (isVisible) carregarDadosAdmin(); }, [isVisible]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery]);
+            if (!isVisible) return null;
+
+            const q = searchQuery.toLowerCase().trim();
+            const doadoresFiltrados = doadoresList.filter(d => d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q)));
+            const doacoesFiltradas = doacoesList.filter(d => (d.doadores && d.doadores.nome.toLowerCase().includes(q)) || d.canal_recebimento.toLowerCase().includes(q));
+
+            return (
+                <div id="tab-admin" className="tab-content active visible space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="bg-white p-5 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-xs"><div className="p-3 bg-rose-50 text-rose-600 rounded-2xl"><i data-lucide="users" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-gray-400 uppercase">Doadores</p><h3 className="text-2xl font-extrabold text-slate-900 mt-1">{metricDoadores}</h3></div></div>
+                        <div className="bg-white p-5 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-xs"><div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><i data-lucide="gift" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-gray-400 uppercase">Doações</p><h3 className="text-2xl font-extrabold text-slate-900 mt-1">{metricDoacoes}</h3></div></div>
+                        <div className="bg-white p-5 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-xs"><div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><i data-lucide="dollar-sign" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-gray-400 uppercase">Total R$</p><h3 className="text-2xl font-extrabold text-slate-900 mt-1">{formatarMoeda(metricFinanceiro)}</h3></div></div>
+                        <div className="bg-white p-5 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-xs"><div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><i data-lucide="package" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-gray-400 uppercase">Materiais</p><h3 className="text-2xl font-extrabold text-slate-900 mt-1">{metricMateriais} un.</h3></div></div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                            <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+                                <button onClick={() => setAdminSubTab('doadores')} className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer ${adminSubTab === 'doadores' ? 'bg-white shadow-xs text-gray-800' : 'text-gray-500'}`}>Doadores</button>
+                                <button onClick={() => setAdminSubTab('doacoes')} className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer ${adminSubTab === 'doacoes' ? 'bg-white shadow-xs text-gray-800' : 'text-gray-500'}`}>Doações</button>
+                            </div>
+                            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar registros..." className="px-4 py-2 rounded-xl border border-gray-200 text-xs w-64" />
+                        </div>
+
+                        {adminSubTab === 'doadores' ? (
+                            <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Nome</th><th className="px-6 py-3.5">Tipo</th><th className="px-6 py-3.5">Documento</th><th className="px-6 py-3.5 text-center">Ações</th></tr></thead><tbody className="divide-y divide-gray-100 text-xs">{doadoresFiltrados.map(d => (<tr key={d.id_doador} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{d.nome}</td><td className="px-6 py-4">{d.tipo_doador}</td><td className="px-6 py-4 font-mono">{formatarDocumento(d.documento || '', d.tipo_doador)}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditDoador(d)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
+                        ) : (
+                            <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Doador</th><th className="px-6 py-3.5">Canal</th><th className="px-6 py-3.5 text-center">Ações</th></tr></thead><tbody className="divide-y divide-gray-100 text-xs">{doacoesFiltradas.map(d => (<tr key={d.id_doacao} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{d.doadores ? d.doadores.nome : 'Desconhecido'}</td><td className="px-6 py-4">{d.canal_recebimento}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditDoacao(d)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
+            const { mostrarToast } = useToast();
+            const [estoqueList, setEstoqueList] = useState([]);
+            const [searchQuery, setSearchQuery] = useState('');
+
+            const carregarEstoque = async () => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const { data } = await estoqueService.buscarEstoqueMateriais();
+                    setEstoqueList(data || []);
+                } catch (e) { console.error(e); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            useEffect(() => { if (isVisible) carregarEstoque(); }, [isVisible]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueList, searchQuery]);
+            if (!isVisible) return null;
+
+            const handlePDF = async () => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const res = await pdfService.exportarPDFEstoqueOficial();
+                    if (res.success) mostrarToast('PDF baixado com sucesso!', 'success');
+                } catch (e) { mostrarToast('Erro PDF: ' + e.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            const q = searchQuery.toLowerCase().trim();
+            const filtrados = estoqueList.filter(m => m.descricao_item.toLowerCase().includes(q) || m.destino_item.toLowerCase().includes(q));
+
+            return (
+                <div id="tab-estoque" className="tab-content active visible space-y-6">
+                    <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 flex justify-between items-center">
+                        <div><h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2"><i data-lucide="boxes" className="text-rose-600"></i> Controle de Estoque e Inventário</h2></div>
+                        <button onClick={handlePDF} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-2 cursor-pointer"><i data-lucide="file-text" className="w-4 h-4 text-rose-400"></i> Baixar Relatório PDF</button>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
+                        <div className="pb-4 border-b border-gray-100"><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar no estoque..." className="px-4 py-2 rounded-xl border border-gray-200 text-xs w-72" /></div>
+                        <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Descrição</th><th className="px-6 py-3.5">Quantidade</th><th className="px-6 py-3.5">Unidade</th><th className="px-6 py-3.5">Destino</th><th className="px-6 py-3.5 text-center">Ações</th></tr></thead><tbody className="divide-y divide-gray-100 text-xs">{filtrados.map(m => (<tr key={m.id_material} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{m.descricao_item}</td><td className="px-6 py-4 font-bold">{m.quantidade}</td><td className="px-6 py-4">{m.unidade_medida}</td><td className="px-6 py-4">{m.destino_item}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoque(m)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 7. VIEWS E ORQUESTRADOR PRINCIPAL
+        // ==========================================
+        function LoginView() {
+            const { login } = useAuth();
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [errorMsg, setErrorMsg] = useState('');
+
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [errorMsg]);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setErrorMsg('');
+                const res = await login(email, password);
+                if (!res.success) {
+                    setErrorMsg(res.error ? res.error.message : 'Credenciais inválidas.');
+                    setPassword('');
+                }
+            };
+
+            return (
+                <div id="global-login-container" className="min-h-screen flex items-center justify-center bg-slate-50 px-4 relative">
+                    <div className="absolute top-6 right-6 z-20"><ThemeSelector /></div>
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 max-w-md w-full relative z-10 space-y-6">
+                        <div className="text-center space-y-2">
+                            <div className="bg-rose-600 text-white p-3 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center shadow-md"><i data-lucide="shield-check" className="w-8 h-8"></i></div>
+                            <h2 className="text-2xl font-extrabold text-slate-900">Portal Institucional</h2>
+                            <p className="text-xs text-gray-500 font-medium">Acesso restrito para operadores autorizados</p>
+                        </div>
+                        <form id="form-global-login" onSubmit={handleSubmit} className="space-y-4">
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail Corporativo</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="E-mail de Acesso" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Senha de Acesso</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Senha de Acesso" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
+                            {errorMsg && <p className="text-xs font-bold text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-center gap-2"><i data-lucide="alert-triangle" className="w-4 h-4"></i> {errorMsg}</p>}
+                            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2"><i data-lucide="log-in" className="w-4 h-4"></i> Entrar no Sistema</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function MainAppView({ onLoadingStart, onLoadingEnd }) {
+            const { mostrarToast } = useToast();
+            const [activeTab, setActiveTab] = useState('doador');
+            const [doadoresGlobal, setDoadoresGlobal] = useState([]);
+            const [categoriasGlobal, setCategoriasGlobal] = useState([]);
+
+            const [editDoadorModalOpen, setEditDoadorModalOpen] = useState(false);
+            const [selectedDoador, setSelectedDoador] = useState(null);
+
+            const [editDoacaoModalOpen, setEditDoacaoModalOpen] = useState(false);
+            const [selectedDoacao, setSelectedDoacao] = useState(null);
+
+            const [editEstoqueModalOpen, setEditEstoqueModalOpen] = useState(false);
+            const [selectedEstoqueItem, setSelectedEstoqueItem] = useState(null);
+
+            const carregarDadosApp = async () => {
+                try {
+                    const { data: dData } = await doadoresService.buscarDoadores();
+                    setDoadoresGlobal(dData || []);
+                    const { data: cData } = await doacoesService.buscarCategoriasItens();
+                    setCategoriasGlobal(cData || []);
+                } catch (e) { console.error(e); }
+            };
+
+            useEffect(() => { carregarDadosApp(); }, []);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [activeTab]);
+
+            const handleSaveDoador = async (dados) => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    await doadoresService.atualizarDoador(dados.id_doador, dados);
+                    mostrarToast('Doador atualizado com sucesso!', 'success');
+                    setEditDoadorModalOpen(false);
+                    carregarDadosApp();
+                } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            const handleSaveDoacao = async (payload) => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    await doacoesService.atualizarDoacaoCompleta(payload.idDoacao, { id_doador: payload.idDoador, canal_recebimento: payload.canal, observacoes: payload.observacoes || null }, { id_doacao: payload.idDoacao, valor: payload.finValor, comprovante_transacao: payload.finComprovante || null }, { id_doacao: payload.idDoacao, id_categoria: payload.matCategoria, descricao_item: payload.matDescricao, quantidade: payload.matQtd, unidade_medida: payload.matUnidade, estado_conservacao: payload.matEstado, destino_item: payload.matDestino }, payload.checkFinanceiro, payload.checkMaterial, selectedDoacao);
+                    mostrarToast('Doação atualizada com sucesso!', 'success');
+                    setEditDoacaoModalOpen(false);
+                    carregarDadosApp();
+                } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            const handleSaveEstoque = async (payload) => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    await estoqueService.atualizarItemEstoqueLote(payload.idMaterial, { descricao_item: payload.novaDesc, id_categoria: payload.novaCat, quantidade: payload.novaQtd, unidade_medida: payload.novaUnidade, estado_conservacao: payload.novoEstado, destino_item: payload.novoDestino });
+                    mostrarToast('Estoque atualizado com sucesso!', 'success');
+                    setEditEstoqueModalOpen(false);
+                    carregarDadosApp();
+                } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            return (
+                <div id="app-container" className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+                    <Header />
+                    <Navbar activeTab={activeTab} onSwitchTab={setActiveTab} />
+                    <main className="pt-2">
+                        <DoadorTab isVisible={activeTab === 'doador'} onDoadorCadastrado={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                        <DoacaoMistaTab isVisible={activeTab === 'doacao_mista'} doadores={doadoresGlobal} categorias={categoriasGlobal} onDoacaoRegistrada={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                        <AdminTab isVisible={activeTab === 'admin'} onOpenEditDoador={(d) => { setSelectedDoador(d); setEditDoadorModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onDataChanged={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                        <EstoqueTab isVisible={activeTab === 'estoque'} onOpenEditEstoque={(m) => { setSelectedEstoqueItem(m); setEditEstoqueModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                    </main>
+
+                    <EditDoadorModal isOpen={editDoadorModalOpen} doador={selectedDoador} onClose={() => setEditDoadorModalOpen(false)} onSave={handleSaveDoador} />
+                    <EditDoacaoModal isOpen={editDoacaoModalOpen} doacao={selectedDoacao} doadores={doadoresGlobal} categorias={categoriasGlobal} onClose={() => setEditDoacaoModalOpen(false)} onSave={handleSaveDoacao} />
+                    <EditEstoqueModal isOpen={editEstoqueModalOpen} item={selectedEstoqueItem} modo="lote" categorias={categoriasGlobal} onClose={() => setEditEstoqueModalOpen(false)} onSave={handleSaveEstoque} />
+                </div>
+            );
+        }
+
+        function AppContent() {
+            const { authenticated } = useAuth();
+            const { mostrarToast } = useToast();
+            const [progressWidth, setProgressWidth] = useState(0);
+            const [progressOpacity, setProgressOpacity] = useState(0);
+
+            const handleLoadingStart = () => {
+                setProgressOpacity(1);
+                setProgressWidth(0);
+                setTimeout(() => setProgressWidth(30), 50);
+                setTimeout(() => setProgressWidth(70), 200);
+            };
+
+            const handleLoadingEnd = () => {
+                setProgressWidth(100);
+                setTimeout(() => {
+                    setProgressOpacity(0);
+                    setTimeout(() => setProgressWidth(0), 300);
+                }, 200);
+            };
+
+            return (
+                <ThemeProvider onShowToast={mostrarToast}>
+                    <ProgressBar width={progressWidth} opacity={progressOpacity} />
+                    <ToastContainer />
+                    {authenticated ? (
+                        <MainAppView onLoadingStart={handleLoadingStart} onLoadingEnd={handleLoadingEnd} />
+                    ) : (
+                        <LoginView />
+                    )}
+                </ThemeProvider>
+            );
+        }
+
+        function App() {
+            return (
+                <ToastProvider>
+                    <AuthProvider>
+                        <AppContent />
+                    </AuthProvider>
+                </ToastProvider>
+            );
+        }
+
+        // Montagem do React na DOM
         const rootElement = document.getElementById('root');
         const root = ReactDOM.createRoot(rootElement);
         root.render(<App />);

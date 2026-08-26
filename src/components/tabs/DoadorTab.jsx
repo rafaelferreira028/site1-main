@@ -1,10 +1,7 @@
 const { useState, useEffect } = React;
-import { criarDoador } from '../../services/doadoresService.js';
-import { formatarDocumento, formatarTelefone } from '../../utils/formatters.js';
-import { useToast } from '../../context/ToastContext.jsx';
 
-export function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd }) {
-    const { mostrarToast } = useToast();
+function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd }) {
+    const { mostrarToast } = window.useToast();
 
     const [nome, setNome] = useState('');
     const [tipoDoador, setTipoDoador] = useState('PF');
@@ -47,7 +44,7 @@ export function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoa
         };
 
         try {
-            const { data, error } = await criarDoador(novoDoador);
+            const { data, error } = await window.doadoresService.criarDoador(novoDoador);
             if (error) {
                 mostrarToast('Erro ao salvar doador: ' + error.message, 'error');
             } else {
@@ -88,7 +85,7 @@ export function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoa
                             <button
                                 type="button"
                                 id="btn-doador-pf"
-                                onClick={() => { setTipoDoador('PF'); setDocumento(formatarDocumento(documento, 'PF')); }}
+                                onClick={() => { setTipoDoador('PF'); setDocumento(window.formatarDocumento(documento, 'PF')); }}
                                 className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PF' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}
                             >
                                 <i data-lucide="user" className="w-4 h-4"></i> Pessoa Física (PF)
@@ -96,7 +93,7 @@ export function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoa
                             <button
                                 type="button"
                                 id="btn-doador-pj"
-                                onClick={() => { setTipoDoador('PJ'); setDocumento(formatarDocumento(documento, 'PJ')); }}
+                                onClick={() => { setTipoDoador('PJ'); setDocumento(window.formatarDocumento(documento, 'PJ')); }}
                                 className={`flex-1 h-full text-sm font-semibold rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${tipoDoador === 'PJ' ? 'bg-white shadow-xs text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}
                             >
                                 <i data-lucide="building-2" className="w-4 h-4"></i> Pessoa Jurídica (PJ)
@@ -113,7 +110,7 @@ export function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoa
                             type="text"
                             id="doador-documento"
                             value={documento}
-                            onChange={(e) => setDocumento(formatarDocumento(e.target.value, tipoDoador))}
+                            onChange={(e) => setDocumento(window.formatarDocumento(e.target.value, tipoDoador))}
                             maxLength={tipoDoador === 'PF' ? 14 : 18}
                             placeholder={tipoDoador === 'PF' ? "000.000.000-00" : "00.000.000/0000-00"}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500 font-mono"
@@ -128,7 +125,7 @@ export function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoa
                             type="tel"
                             id="doador-telefone"
                             value={telefone}
-                            onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+                            onChange={(e) => setTelefone(window.formatarTelefone(e.target.value))}
                             maxLength={15}
                             placeholder="(00) 00000-0000"
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500 font-mono"
@@ -185,3 +182,5 @@ export function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoa
         </div>
     );
 }
+
+window.DoadorTab = DoadorTab;
