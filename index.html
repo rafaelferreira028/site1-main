@@ -1317,7 +1317,7 @@
                                     <i data-lucide="search" className="w-4 h-4 absolute left-3.5 top-3 text-gray-400"></i>
                                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar doador, item ou valor..." className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs focus:border-rose-500" />
                                 </div>
-                                <button onClick={handleExportarPDF} className="bg-rose-600 text-white hover:bg-rose-700 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-600/20 whitespace-nowrap" title="Baixar Relatório Oficial em PDF"><i data-lucide="file-text" className="w-4 h-4"></i> Relatório PDF</button>
+                                <button onClick={handleExportarPDF} className="group bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-600/20 hover:shadow-lg hover:shadow-rose-600/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 whitespace-nowrap select-none" title="Baixar Relatório Oficial em PDF"><i data-lucide="file-text" className="w-4 h-4 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6"></i> Relatório PDF</button>
                             </div>
                         </div>
 
@@ -1566,7 +1566,7 @@
                 <div id="tab-estoque" className="tab-content active visible space-y-6">
                     <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 flex justify-between items-center">
                         <div><h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2"><i data-lucide="boxes" className="text-rose-600"></i> Controle Integrado de Estoque e Inventário</h2></div>
-                        <button onClick={handlePDF} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-2 cursor-pointer"><i data-lucide="file-text" className="w-4 h-4 text-rose-400"></i> Baixar Relatório PDF</button>
+                        <button onClick={handlePDF} className="group px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs flex items-center gap-2 cursor-pointer transition-all duration-200 shadow-md hover:shadow-lg hover:shadow-slate-900/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 select-none"><i data-lucide="file-text" className="w-4 h-4 text-rose-400 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6"></i> Baixar Relatório PDF</button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

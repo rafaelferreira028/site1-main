@@ -246,10 +246,10 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                         </div>
                         <button
                             onClick={handleExportarPDF}
-                            className="bg-rose-600 text-white hover:bg-rose-700 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-600/20 whitespace-nowrap"
+                            className="group bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-600/20 hover:shadow-lg hover:shadow-rose-600/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 whitespace-nowrap select-none"
                             title="Baixar Relatório Oficial de Doações em PDF"
                         >
-                            <i data-lucide="file-text" className="w-4 h-4"></i> Relatório PDF
+                            <i data-lucide="file-text" className="w-4 h-4 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6"></i> Relatório PDF
                         </button>
                     </div>
                 </div>

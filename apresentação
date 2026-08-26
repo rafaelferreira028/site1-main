@@ -1,166 +1,83 @@
-
 -- ================================================================
--- APRESENTACAO -- Banco de Dados 2 Bimestre
--- Sistema: MyBank SQL (Gestão de Doações Institucionais)
+-- APRESENTACAO -- Banco de Dados 3º Bimestre
+-- Sistema: Controle de Estoque e Doações (ONG Social)
 -- ================================================================
 -- Estrutura:
---    Setup    -- DDL, Procedure, Constraints, DCL
---    Insercao -- DML com 3 níveis de hash demonstrados
---    Secao 2  -- Modelagem do Banco de Dados
---    Secao 3  -- Segurança dos Dados (Hash / KDF / LGPD)
---    Secao 4  -- Funções SQL (Texto, Numéricas, Data)
---    Secao 5  -- Relacionamento e Integridade Referencial
---    Secao 6  -- Consultas Avançadas com JOIN
---    Secao 7  -- Relatórios, Indicadores e Business Intelligence
---    Secao 9  -- Conclusão (dificuldades, aprendizados, melhorias)
+--    Setup      -- DDL, Procedure, Constraints, DCL
+--    Insercao   -- DML com dados reais de estoque e doações
+--    Secao 2    -- Funções de Agregação (COUNT, SUM, MAX, MIN, AVG)
+--    Secao 3    -- GROUP BY e HAVING
+--    Secao 4    -- Operadores de Conjunto (UNION, UNION ALL)
+--    Secao 5    -- DISTINCT, IN, EXISTS e NOT EXISTS
+--    Secao 6    -- Índices e SHOW INDEX
+--    Secao 7    -- Análise de Consulta com EXPLAIN
+--    Secao 8    -- Views (Visões)
+--    Secao 9    -- Functions (Funções SQL)
+--    Secao 10   -- Relatório Avançado do Sistema
+--    Secao 11   -- Conclusão (dificuldades, aprendizados, melhorias)
 -- ================================================================
 
 -- ================================================================
 -- SETUP -- Recriar banco do zero para apresentação limpa
 -- ================================================================
 
-DROP DATABASE IF EXISTS mybank_sql;
+DROP DATABASE IF EXISTS ong_estoque_db;
 
-DROP USER IF EXISTS 'admin_mybank'@'localhost';
-DROP USER IF EXISTS 'financeiro_mybank'@'localhost';
-DROP USER IF EXISTS 'analista_bazar'@'localhost';
+DROP USER IF EXISTS 'admin_ong'@'localhost';
+DROP USER IF EXISTS 'estoquista_ong'@'localhost';
 
-CREATE DATABASE mybank_sql CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE mybank_sql;
+CREATE DATABASE ong_estoque_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE ong_estoque_db;
 
 -- ----------------------------------------------------------------
 -- Tabelas (Modelagem com UUIDs para o MySQL 8.0)
 -- ----------------------------------------------------------------
 
 CREATE TABLE doadores (
-    id_doador       CHAR(36)      PRIMARY KEY DEFAULT (UUID()),
-    nome            VARCHAR(150)  NOT NULL,
-    tipo_doador     ENUM('PF', 'PJ') NOT NULL,
-    documento       VARCHAR(20)   NOT NULL UNIQUE, 
-    telefone        VARCHAR(20),
-    email           VARCHAR(100)  NOT NULL UNIQUE,
-    senha           VARCHAR(64)   NOT NULL,
-    salt            VARCHAR(64)   NOT NULL,
-    status_doador   ENUM('Ativo', 'Inativo', 'Suspeito') DEFAULT 'Ativo',
-    created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id_doador      CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
+    nome           VARCHAR(150)   NOT NULL,
+    email          VARCHAR(100)   NOT NULL UNIQUE,
+    telefone       VARCHAR(20),
+    created_at     TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE categorias_itens (
-    id_categoria    INT AUTO_INCREMENT PRIMARY KEY,
-    nome_categoria  VARCHAR(50)   NOT NULL UNIQUE
+CREATE TABLE categorias (
+    id_categoria   INT AUTO_INCREMENT PRIMARY KEY,
+    nome_categoria VARCHAR(50)   NOT NULL UNIQUE
+);
+
+CREATE TABLE estoque (
+    id_item        CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
+    id_categoria   INT            NOT NULL,
+    nome_item      VARCHAR(150)   NOT NULL,
+    quantidade     INT            NOT NULL DEFAULT 0,
+    valor_unitario DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    CONSTRAINT fk_estoque_categoria FOREIGN KEY (id_categoria) 
+        REFERENCES categorias(id_categoria) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE TABLE doacoes (
-    id_doacao         CHAR(36)    PRIMARY KEY DEFAULT (UUID()),
-    id_doador         CHAR(36),
-    data_doacao       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    canal_recebimento ENUM('Presencial', 'PIX', 'Conta Bancária', 'Bazar', 'Cofrinho') NOT NULL,
-    tipo_doacao       ENUM('Financeira', 'Material', 'Mista') NOT NULL,
-    observacoes       TEXT
+    id_doacao      CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
+    id_doador      CHAR(36),
+    data_doacao    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    observacoes    TEXT,
+    CONSTRAINT fk_doacao_doador FOREIGN KEY (id_doador) 
+        REFERENCES doadores(id_doador) ON DELETE SET NULL ON UPDATE CASCADE
 );
-
-CREATE TABLE doacoes_financeiras (
-    id_financeiro          CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
-    id_doacao              CHAR(36)       NOT NULL,
-    valor                  DECIMAL(10, 2) NOT NULL,
-    comprovante_transacao  VARCHAR(255),
-    situacao_compensacao   ENUM('Pendente', 'Compensado', 'Estornado') DEFAULT 'Pendente'
-);
-
-CREATE TABLE doacoes_materiais (
-    id_material        CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
-    id_doacao          CHAR(36)       NOT NULL,
-    id_categoria       INT            NOT NULL,
-    descricao_item     VARCHAR(150)   NOT NULL,
-    quantidade         INT            NOT NULL DEFAULT 1,
-    unidade_medida     ENUM('Unidade', 'Kg', 'Pacote', 'Cm') DEFAULT 'Unidade',
-    estado_conservacao ENUM('Novo', 'Seminovo', 'Não se aplica') DEFAULT 'Não se aplica',
-    destino_item       ENUM('Uso Direto Paciente', 'Bazar', 'Estoque Geral', 'Consumo Interno') NOT NULL
-);
-
--- ----------------------------------------------------------------
--- Procedure de cadastro com hash defensivo em 3 camadas
--- ----------------------------------------------------------------
-
-DELIMITER $$
-
-CREATE PROCEDURE cadastrar_doador(
-    IN p_nome        VARCHAR(150),
-    IN p_tipo        VARCHAR(2),
-    IN p_documento   VARCHAR(20),
-    IN p_telefone    VARCHAR(20),
-    IN p_email       VARCHAR(100),
-    IN p_senha       VARCHAR(255)
-)
-BEGIN
-    DECLARE v_id         CHAR(36);
-    DECLARE v_now        TIMESTAMP;
-    DECLARE v_salt       VARCHAR(64);
-    DECLARE v_senha_hash VARCHAR(64);
-
-    SET v_id  = UUID();
-    SET v_now = NOW();
-
-    -- Nível 1: salt único combinando identificador global + timestamp interno
-    SET v_salt = SHA2(CONCAT(v_id, v_now), 256);
-
-    -- Nível 2 + 3: Key Stretching com 3 iterações consecutivas de SHA2-256 e injeção do salt
-    SET v_senha_hash = SHA2(
-                           SHA2(
-                               SHA2(CONCAT(p_senha, v_salt), 256),
-                               256),
-                           256);
-
-    INSERT INTO doadores (id_doador, nome, tipo_doador, documento, telefone, email, senha, salt, created_at)
-    VALUES (v_id, p_nome, p_tipo, p_documento, p_telefone, p_email, v_senha_hash, v_salt, v_now);
-END$$
-
-DELIMITER ;
-
--- ----------------------------------------------------------------
--- Constraints & Integridade Referencial
--- ----------------------------------------------------------------
-
-ALTER TABLE doacoes_financeiras ADD CONSTRAINT chk_valor_positivo 
-    CHECK (valor > 0);
-
-ALTER TABLE doacoes_materiais ADD CONSTRAINT chk_qtd_positiva 
-    CHECK (quantidade > 0);
-
-ALTER TABLE doacoes ADD CONSTRAINT fk_doacao_doador
-    FOREIGN KEY (id_doador) REFERENCES doadores(id_doador) ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE doacoes_financeiras ADD CONSTRAINT fk_financeiro_doacao
-    FOREIGN KEY (id_doacao) REFERENCES doacoes(id_doacao) ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE doacoes_materiais ADD CONSTRAINT fk_material_doacao
-    FOREIGN KEY (id_doacao) REFERENCES doacoes(id_doacao) ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE doacoes_materiais ADD CONSTRAINT fk_material_categoria
-    FOREIGN KEY (id_categoria) REFERENCES categorias_itens(id_categoria) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- ----------------------------------------------------------------
 -- DCL -- Gerenciamento de Privilégios e Perfis de Acesso
 -- ----------------------------------------------------------------
 
-CREATE USER IF NOT EXISTS 'admin_mybank'@'localhost'       IDENTIFIED BY 'admin_senha_forte';
-CREATE USER IF NOT EXISTS 'financeiro_mybank'@'localhost'  IDENTIFIED BY 'fin_senha_123';
-CREATE USER IF NOT EXISTS 'analista_bazar'@'localhost'      IDENTIFIED BY 'bazar_senha_123';
+CREATE USER IF NOT EXISTS 'admin_ong'@'localhost'       IDENTIFIED BY 'admin_senha_forte';
+CREATE USER IF NOT EXISTS 'estoquista_ong'@'localhost'  IDENTIFIED BY 'estoque_123';
 
 -- Administrador possui controle total irrestrito
-GRANT ALL PRIVILEGES ON mybank_sql.* TO 'admin_mybank'@'localhost' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON ong_estoque_db.* TO 'admin_ong'@'localhost' WITH GRANT OPTION;
 
--- Perfil Financeiro manipula transações em dinheiro e visualiza doadores
-GRANT SELECT, INSERT, UPDATE ON mybank_sql.doacoes            TO 'financeiro_mybank'@'localhost';
-GRANT SELECT, INSERT, UPDATE ON mybank_sql.doacoes_financeiras TO 'financeiro_mybank'@'localhost';
-GRANT SELECT                 ON mybank_sql.doadores            TO 'financeiro_mybank'@'localhost';
-
--- Perfil de Operações do Bazar manipula apenas o controle de itens físicos
-GRANT SELECT, INSERT, UPDATE ON mybank_sql.doacoes_materiais   TO 'analista_bazar'@'localhost';
-GRANT SELECT                 ON mybank_sql.categorias_itens    TO 'analista_bazar'@'localhost';
-
--- Aplicação do princípio do menor privilégio (Garantia de Compliance/Segurança)
-REVOKE UPDATE ON mybank_sql.doacoes_financeiras FROM 'financeiro_mybank'@'localhost';
+-- Perfil Estoquista gerencia apenas itens e categorias
+GRANT SELECT, INSERT, UPDATE ON ong_estoque_db.estoque     TO 'estoquista_ong'@'localhost';
+GRANT SELECT                 ON ong_estoque_db.categorias  TO 'estoquista_ong'@'localhost';
 
 FLUSH PRIVILEGES;
 
@@ -169,196 +86,216 @@ FLUSH PRIVILEGES;
 -- INSERÇÃO DE DADOS (DML)
 -- ================================================================
 
--- ----------------------------------------------------------------
--- Carga de Domínio Inicial para Categorias
--- ----------------------------------------------------------------
-INSERT INTO categorias_itens (nome_categoria) VALUES 
-('Dinheiro'),
-('Alimentos / Cesta Básica'),
-('Produtos de Higiene'),
-('Cabelo (Perucas)'),
-('Equipamentos Ortopédicos'),
-('Vestuário (Bazar)');
+INSERT INTO categorias (nome_categoria) VALUES 
+('Alimentos'),
+('Vestuário'),
+('Higiene'),
+('Limpeza');
 
--- ----------------------------------------------------------------
--- Doadores -- Demonstração Prática de Vulnerabilidade vs Segurança
--- ----------------------------------------------------------------
+INSERT INTO doadores (id_doador, nome, email, telefone) VALUES 
+    ('d2000000-0000-0000-0000-000000000001', 'Ana Paula Ribeiro', 'ana@email.com', '(44) 99111-2222'),
+    ('d2000000-0000-0000-0000-000000000002', 'Marcos Vinicius', 'marcos@email.com', '(44) 99222-3333'),
+    ('d2000000-0000-0000-0000-000000000003', 'Carla Dias', 'carla@email.com', '(43) 99333-4444');
 
--- [NÍVEL 1 -- LEGADO VULNERÁVEL]
--- Simulação de criptografia fraca (SHA2 sem salt). Mesma senha gera hashes idênticos.
-INSERT INTO doadores (id_doador, nome, tipo_doador, documento, telefone, email, senha, salt, created_at) VALUES
-    (UUID(), 'Carlos Henrique Silva', 'PF', '111.222.333-44', '(44) 9999-1111', 'carlos@email.com', SHA2('senhaDoacao123', 256), '', NOW()),
-    (UUID(), 'Mariana Souza Dias',    'PF', '555.666.777-88', '(44) 9999-2222', 'mariana@email.com', SHA2('senhaDoacao123', 256), '', NOW());
+INSERT INTO estoque (id_item, id_categoria, nome_item, quantidade, valor_unitario) VALUES 
+    (UUID(), 1, 'Cesta Básica 10kg', 15, 85.50),
+    (UUID(), 1, 'Pacote de Arroz 5kg', 30, 24.00),
+    (UUID(), 2, 'Casaco de Inverno', 4, 60.00),
+    (UUID(), 2, 'Kit de Meias', 25, 12.50),
+    (UUID(), 3, 'Kit Higiene Pessoal', 18, 35.00),
+    (UUID(), 4, 'Desinfetante 2L', 2, 10.00);
 
--- [NÍVEL 3 -- ATUAL SEGURO]
--- Cadastro corporativo utilizando nossa Stored Procedure criptográfica
-CALL cadastrar_doador('Roberto Almeida', 'PF', '123.456.789-00', '(44) 98888-0101', 'roberto@email.com', 'senhaDoacao123');
-CALL cadastrar_doador('Fernanda Costa',  'PF', '987.654.321-11', '(44) 98888-0202', 'fernanda@email.com', 'senhaDoacao123');
-CALL cadastrar_doador('Tech Solutions',  'PJ', '12.345.678/0001-99', '(11) 3333-4444', 'contato@tech.com', 'senhaEmpresa456');
-CALL cadastrar_doador('Luciana Mendes',  'PF', '222.333.444-55', '(43) 97777-1234', 'luciana@email.com', 'minhasenha123');
-CALL cadastrar_doador('Fundação Vida',   'PJ', '99.888.777/0001-00', '(41) 3030-5050', 'diretoria@vida.org', 'ajudarfazbem');
-
--- ----------------------------------------------------------------
--- Registro de Doações e Vínculos Financeiros/Materiais
--- ----------------------------------------------------------------
-
--- Caso 1: Doações Financeiras Liquidadas/Compensadas (Histórico Recente)
-INSERT INTO doacoes (id_doacao, id_doador, data_doacao, canal_recebimento, tipo_doacao, observacoes) VALUES
-    ('d1000000-0000-0000-0000-000000000001', (SELECT id_doador FROM doadores WHERE email = 'roberto@email.com'), '2026-05-10 14:20:00', 'PIX', 'Financeira', 'Doação mensal recorrente');
-INSERT INTO doacoes_financeiras (id_doacao, valor, comprovante_transacao, situacao_compensacao) VALUES
-    ('d1000000-0000-0000-0000-000000000001', 250.00, 'COMP-PIX-982312', 'Compensado');
-
-INSERT INTO doacoes (id_doacao, id_doador, data_doacao, canal_recebimento, tipo_doacao, observacoes) VALUES
-    ('d1000000-0000-0000-0000-000000000002', (SELECT id_doador FROM doadores WHERE email = 'contato@tech.com'), '2026-05-15 09:00:00', 'Conta Bancária', 'Financeira', 'Apoio institucional anual');
-INSERT INTO doacoes_financeiras (id_doacao, valor, comprovante_transacao, situacao_compensacao) VALUES
-    ('d1000000-0000-0000-0000-000000000002', 5000.00, 'TED-77321-BB', 'Compensado');
-
--- Caso 2: Doações Financeiras Pendentes de Conciliação
-INSERT INTO doacoes (id_doacao, id_doador, data_doacao, canal_recebimento, tipo_doacao, observacoes) VALUES
-    ('d1000000-0000-0000-0000-000000000003', (SELECT id_doador FROM doadores WHERE email = 'fernanda@email.com'), '2026-06-24 22:15:00', 'PIX', 'Financeira', 'Aguardando extrato bancário');
-INSERT INTO doacoes_financeiras (id_doacao, valor, comprovante_transacao, situacao_compensacao) VALUES
-    ('d1000000-0000-0000-0000-000000000003', 150.00, 'COMP-PIX-112233', 'Pendente');
-
--- Caso 3: Doações de Materiais Físicos direcionados ao Bazar e Estoque
-INSERT INTO doacoes (id_doacao, id_doador, data_doacao, canal_recebimento, tipo_doacao, observacoes) VALUES
-    ('d1000000-0000-0000-0000-000000000004', (SELECT id_doador FROM doadores WHERE email = 'luciana@email.com'), '2026-06-10 16:00:00', 'Presencial', 'Material', 'Limpeza de armário residencial');
-INSERT INTO doacoes_materiais (id_doacao, id_categoria, descricao_item, quantidade, unidade_medida, estado_conservacao, destino_item) VALUES
-    ('d1000000-0000-0000-0000-000000000004', (SELECT id_categoria FROM categorias_itens WHERE nome_categoria = 'Vestuário (Bazar)'), 'Lote de Casacos de Inverno', 12, 'Unidade', 'Seminovo', 'Bazar');
-
-INSERT INTO doacoes (id_doacao, id_doador, data_doacao, canal_recebimento, tipo_doacao, observacoes) VALUES
-    ('d1000000-0000-0000-0000-000000000005', (SELECT id_doador FROM doadores WHERE email = 'diretoria@vida.org'), '2026-06-20 11:30:00', 'Presencial', 'Material', 'Doação de parceiro comercial');
-INSERT INTO doacoes_materiais (id_doacao, id_categoria, descricao_item, quantidade, unidade_medida, estado_conservacao, destino_item) VALUES
-    ('d1000000-0000-0000-0000-000000000005', (SELECT id_categoria FROM categorias_itens WHERE nome_categoria = 'Cabelo (Perucas)'), 'Mechas de Cabelo Humano (40cm)', 5, 'Pacote', 'Novo', 'Uso Direto Paciente');
+INSERT INTO doacoes (id_doacao, id_doador, data_doacao, observacoes) VALUES 
+    (UUID(), 'd2000000-0000-0000-0000-000000000001', '2026-06-01 10:00:00', 'Doação mensal de alimentos'),
+    (UUID(), 'd2000000-0000-0000-0000-000000000002', '2026-06-10 14:30:00', 'Campanha do agasalho');
 
 
 -- ================================================================
--- SEÇÃO 3 -- SEGURANÇA DOS DADOS (DEMONSTRAÇÃO DE CRIPTOGRAFIA)
+-- SEÇÃO 2 -- FUNÇÕES DE AGREGAÇÃO (COUNT, SUM, MAX, MIN, AVG)
 -- ================================================================
-
--- Exibição comparativa lado a lado das estratégias de segurança
 SELECT 
-    nome,
-    CASE 
-        WHEN salt = '' THEN 'VULNERÁVEL -- SHA2 Sem Salt (Ataque por Dicionário)'
-        ELSE 'ALTAMENTE SEGURO -- Salt Randômico + 3x Iterações'
-    END AS diagnostico_seguranca,
-    LEFT(senha, 20) AS fragmento_hash,
-    LEFT(salt, 20) AS fragmento_salt
-FROM doadores
-ORDER BY salt ASC;
+    COUNT(*) AS total_itens_estoque,
+    SUM(quantidade) AS quantidade_total_pecas,
+    MAX(quantidade) AS maior_lote,
+    MIN(quantidade) AS menor_lote,
+    ROUND(AVG(quantidade), 2) AS media_por_lote
+FROM estoque;
 
 
 -- ================================================================
--- SEÇÃO 4 -- FUNÇÕES SQL (MANDATÓRIAS)
+-- SEÇÃO 3 -- GROUP BY e HAVING
 -- ================================================================
-
--- ==== Funções de Texto ====
--- UPPER e CONCAT: Geração de etiquetas de identificação de relatórios
-SELECT CONCAT('DOADOR: ', UPPER(nome), ' | CONTATO: ', email) AS etiqueta_mala_direta
-FROM doadores LIMIT 3;
-
--- REPLACE: Mascaramento de dados parciais para conformidade com a LGPD
-SELECT nome, REPLACE(documento, SUBSTR(documento, 4, 6), '***.***') AS documento_protegido
-FROM doadores;
-
--- ==== Funções Numéricas ====
--- SUM, ROUND, AVG: Extração instantânea de métricas financeiras
 SELECT 
-    COUNT(*) AS total_transacoes,
-    ROUND(SUM(valor), 2) AS receita_total,
-    ROUND(AVG(valor), 2) AS ticket_medio_doado
-FROM doacoes_financeiras 
-WHERE situacao_compensacao = 'Compensado';
+    c.nome_categoria, 
+    COUNT(e.id_item) AS total_produtos,
+    SUM(e.quantidade) AS quantidade_total
+FROM estoque e
+JOIN categorias c ON e.id_categoria = c.id_categoria
+GROUP BY c.nome_categoria
+HAVING SUM(e.quantidade) > 5;
 
--- ==== Funções de Data ====
--- NOW, DATE_FORMAT, DATEDIFF: Análise de tempo decorrido desde transações
+
+-- ================================================================
+-- SEÇÃO 4 -- OPERADORES DE CONJUNTO (UNION / UNION ALL)
+-- ================================================================
+SELECT nome_item, quantidade, 'Alimentos' AS setor FROM estoque WHERE id_categoria = 1
+UNION
+SELECT nome_item, quantidade, 'Vestuário' AS setor FROM estoque WHERE id_categoria = 2;
+
+
+-- ================================================================
+-- SEÇÃO 5 -- DISTINCT, IN, EXISTS e NOT EXISTS
+-- ================================================================
+
+-- a) DISTINCT: Categorias únicas presentes no estoque
+SELECT DISTINCT c.nome_categoria 
+FROM categorias c 
+JOIN estoque e ON c.id_categoria = e.id_categoria;
+
+-- b) IN: Filtrar itens de categorias específicas
+SELECT * FROM estoque 
+WHERE id_categoria IN (1, 3);
+
+-- c) EXISTS: Doadores que possuem doações registradas
+SELECT * FROM doadores d
+WHERE EXISTS (
+    SELECT 1 FROM doacoes doacao WHERE doacao.id_doador = d.id_doador
+);
+
+-- d) NOT EXISTS: Doadores cadastrados que nunca realizaram doações
+SELECT * FROM doadores d
+WHERE NOT EXISTS (
+    SELECT 1 FROM doacoes doacao WHERE doacao.id_doador = d.id_doador
+);
+
+
+-- ================================================================
+-- SEÇÃO 6 -- ÍNDICES E SHOW INDEX
+-- ================================================================
+CREATE INDEX idx_estoque_nome ON estoque(nome_item);
+
+SHOW INDEX FROM estoque;
+
+
+-- ================================================================
+-- SEÇÃO 7 -- ANÁLISE DE CONSULTA COM EXPLAIN
+-- ================================================================
+EXPLAIN SELECT * FROM estoque WHERE nome_item = 'Cesta Básica 10kg';
+
+
+-- ================================================================
+-- SEÇÃO 8 -- VIEWS (VISÕES)
+-- ================================================================
+
+-- View 1: Resumo consolidado do estoque por categoria
+CREATE OR REPLACE VIEW vw_resumo_estoque AS
 SELECT 
-    d.id_doacao,
-    DATE_FORMAT(d.data_doacao, '%d/%m/%Y às %H:%i') AS data_formatada,
-    DATEDIFF(NOW(), d.data_doacao) AS dias_decorridos_ate_hoje
-FROM doacoes d;
+    c.nome_categoria, 
+    COUNT(e.id_item) AS itens_cadastrados, 
+    SUM(e.quantidade) AS total_unidades
+FROM categorias c
+LEFT JOIN estoque e ON c.id_categoria = e.id_categoria
+GROUP BY c.nome_categoria;
+
+-- Teste da View 1
+SELECT * FROM vw_resumo_estoque;
+
+-- View 2: Relatório de Doadores Ativos
+CREATE OR REPLACE VIEW vw_doadores_ativos AS
+SELECT DISTINCT d.id_doador, d.nome, d.email
+FROM doadores d
+JOIN doacoes doacao ON doacao.id_doador = d.id_doador;
+
+-- Teste da View 2
+SELECT * FROM vw_doadores_ativos;
 
 
 -- ================================================================
--- SEÇÃO 5 -- RELACIONAMENTO E INTEGRIDADE REFERENCIAL
+-- SEÇÃO 9 -- FUNCTIONS (FUNÇÕES SQL)
 -- ================================================================
--- Comprovação das regras restrictivas e tratamento automático em cascata.
+
+DELIMITER $$
+
+-- Função 1: Calcular valor total de um lote com base na quantidade e preço unitário
+CREATE FUNCTION fn_calcular_total_lote(p_qtd INT, p_valor_unit DECIMAL(10,2)) 
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+BEGIN
+    RETURN p_qtd * p_valor_unit;
+END$$
+
+-- Função 2: Classificar nível de criticidade do estoque
+CREATE FUNCTION fn_classificar_estoque(p_qtd INT) 
+RETURNS VARCHAR(30)
+DETERMINISTIC
+BEGIN
+    IF p_qtd < 5 THEN
+        RETURN 'Estoque Crítico (Baixo)';
+    ELSEIF p_qtd BETWEEN 5 AND 20 THEN
+        RETURN 'Estoque Moderado';
+    ELSE
+        RETURN 'Estoque Saudável (Alto)';
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- Testes de Execução das Funções:
+SELECT fn_calcular_total_lote(10, 85.50) AS valor_calculado_lote;
+
 SELECT 
-    CONSTRAINT_NAME AS nome_chave, TABLE_NAME AS tabela_dependente, 
-    REFERENCED_TABLE_NAME AS tabela_pai
-FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-WHERE TABLE_SCHEMA = 'mybank_sql' AND REFERENCED_TABLE_NAME IS NOT NULL;
+    nome_item, 
+    quantidade, 
+    fn_classificar_estoque(quantidade) AS status_estoque 
+FROM estoque;
 
 
 -- ================================================================
--- SEÇÃO 6 -- CONSULTAS COM JOIN
+-- SEÇÃO 10 -- RELATÓRIO AVANÇADO DO SISTEMA
 -- ================================================================
-
--- INNER JOIN: Cruzamento perfeito mapeando doações ativas de doadores cadastrados
-SELECT r.nome AS doador, d.tipo_doacao, d.canal_recebimento, f.valor
-FROM doacoes d
-INNER JOIN doadores r ON d.id_doador = r.id_doador
-INNER JOIN doacoes_financeiras f ON d.id_doacao = f.id_doacao;
-
--- LEFT JOIN FILTRADO: Rastreamento de doadores inativos que nunca efetuaram ações reais
-SELECT dr.nome, dr.email, dr.status_doador
-FROM doadores dr
-LEFT JOIN doacoes d ON dr.id_doador = d.id_doador
-WHERE d.id_doacao IS NULL;
-
-
--- ================================================================
--- SEÇÃO 7 -- RELATÓRIOS E INDICADORES (BUSINESS INTELLIGENCE)
--- ================================================================
-
--- Indicador 1: Consolidação Geral do Painel de B.I (Visão Geral de Caixa e Itens)
 SELECT 
-    d.canal_recebimento,
-    COUNT(d.id_doacao) AS total_ocorrencias,
-    COALESCE(SUM(df.valor), 0.00) AS total_arrecadado_moeda
-FROM doacoes d
-LEFT JOIN doacoes_financeiras df ON d.id_doacao = df.id_doacao
-GROUP BY d.canal_recebimento;
-
--- Indicador 2: Destinação de Materiais Críticos do Estoque
-SELECT dm.destino_item, SUM(dm.quantidade) AS volumes_recebidos, c.nome_categoria
-FROM doacoes_materiais dm
-JOIN categorias_itens c ON dm.id_categoria = c.id_categoria
-GROUP BY dm.destino_item, c.nome_categoria;
+    c.nome_categoria,
+    COUNT(e.id_item) AS total_tipos_itens,
+    SUM(e.quantidade) AS soma_total_unidades,
+    ROUND(AVG(e.quantidade), 2) AS media_unidades_por_item
+FROM categorias c
+JOIN estoque e ON c.id_categoria = e.id_categoria
+WHERE e.quantidade > 0
+GROUP BY c.nome_categoria
+HAVING SUM(e.quantidade) >= 5
+ORDER BY soma_total_unidades DESC;
 
 
 -- ================================================================
--- SEÇÃO 9 -- CONCLUSÃO
+-- SEÇÃO 11 -- CONCLUSÃO
 -- ================================================================
 
 -- ----------------------------------------------------------------
 -- Principais dificuldades encontradas
 -- ----------------------------------------------------------------
--- 1. Versionamento do Motor de UUIDs:
---    O MySQL 8.0 permite a declaração estrutural DEFAULT(UUID()), porém,
---    a sintaxe requer obrigatoriamente parênteses duplos envoltos à função.
---    A ausência deste detalhe gerou erros de parsing na compilação inicial.
+-- 1. Padronização de Tipos em Operadores de Conjunto:
+--    Garantir compatibilidade exata de quantidade e ordem de colunas 
+--    ao mesclar dados através do operador UNION.
 --
--- 2. Mitigação de Ataques de Força Bruta via SQL Puro:
---    A indisponibilidade de bibliotecas nativas como BCrypt/Argon2 dentro
---    do ecossistema SQL tradicional nos forçou a desenhar um algoritmo 
---    procedural de Key Stretching baseado em iterações de SHA2.
+-- 2. Regras de Integridade Referencial em Exclusões:
+--    Ajustar as restrições ON DELETE RESTRICT e ON DELETE SET NULL
+--    para evitar falhas de chave estrangeira ao apagar registros de doadores.
 --
--- 3. Temporalidade Dinâmica dos Relatórios:
---    Desenhar relatórios analíticos imutáveis exige atenção ao fator temporal,
---    utilizando o cálculo de DATEDIFF baseado no ano corrente de 2026.
+-- 3. Concepção Lógica de Funções Determinísticas:
+--    Definir corretamente os parâmetros de entrada e retornos escalares 
+--    dentro da sintaxe em PL/pgSQL / MySQL Procedures.
 
 -- ----------------------------------------------------------------
 -- Conhecimentos adquiridos
 -- ----------------------------------------------------------------
--- - Engenharia de segurança aplicada à persistência de dados sensíveis (LGPD).
--- - Manipulação e isolamento de privilégios através de comandos nativos de DCL.
--- - Implementação prática de Integridade Cadastral com ON DELETE SET NULL.
--- - Utilização avançada de funções de agregação aninhadas a Joins não-exclusivos.
+-- - Aplicação prática de funções de agregação estruturadas com GROUP BY e HAVING.
+-- - Otimização de consultas por meio da criação e validação de índices com SHOW INDEX e EXPLAIN.
+-- - Encapsulamento de regras de negócio complexas utilizando Views e Functions SQL.
+-- - Controle rígido de perfis de acesso e privilégios utilizando comandos DCL.
 
 -- ----------------------------------------------------------------
 -- Melhorias futuras para o banco de dados do sistema
 -- ----------------------------------------------------------------
--- 1. Acoplamento de Índices Compostos em campos de busca (documento, email).
--- 2. Migração da camada de abstração criptográfica para microsserviços externos.
--- 3. Criação de Eventos Agendados (MySQL Events) para auditorias de fraude semanais.
+-- 1. Criação de Triggers de auditoria para registrar log automático de alterações no estoque.
+-- 2. Implementação de índices compostos em tabelas transacionais de alto volume.
+-- 3. Automação de relatórios periódicos utilizando rotinas agendadas no SGBD.

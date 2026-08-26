@@ -167,10 +167,10 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
                 <div className="flex flex-wrap items-center gap-3">
                     <button
                         onClick={handleGerarPDF}
-                        className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition duration-150 shadow-md cursor-pointer flex items-center gap-2"
+                        className="group px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs transition-all duration-200 shadow-md hover:shadow-lg hover:shadow-slate-900/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer flex items-center gap-2 select-none"
                         title="Baixar Relatório de Estoque em PDF"
                     >
-                        <i data-lucide="file-text" className="w-4 h-4 text-rose-400"></i>
+                        <i data-lucide="file-text" className="w-4 h-4 text-rose-400 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6"></i>
                         <span>Baixar Relatório PDF</span>
                     </button>
                 </div>
