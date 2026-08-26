@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, onLoadingStart, onLoadingEnd }) {
     const { mostrarToast } = window.useToast();
@@ -20,6 +20,21 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
     const [matUnidade, setMatUnidade] = useState('Unidade');
     const [matEstado, setMatEstado] = useState('Não se aplica');
     const [matDestino, setMatDestino] = useState('Estoque Geral');
+
+    const searchContainerRef = useRef(null);
+
+    // Fechar dropdown ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+                setDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     useEffect(() => {
         if (categorias.length > 0 && !matCategoria) {
@@ -47,6 +62,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
     const resetForm = () => {
         setIdDoador('');
         setDoadorSearchQuery('');
+        setDropdownOpen(false);
         setCanal('Presencial');
         setObservacoes('');
         setCheckFinanceiro(false);
@@ -152,7 +168,8 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
 
             <form id="form-doacao" onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative" id="container-search-doador-form">
+                    {/* Pesquisar Doador com fechamento ao clicar fora e botão de limpar */}
+                    <div className="relative" ref={searchContainerRef} id="container-search-doador-form">
                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Pesquisar Doador *</label>
                         <div className="relative">
                             <input
@@ -165,11 +182,12 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                                 placeholder="Digite o nome ou CPF/CNPJ..."
                                 className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500 ${idDoador ? 'bg-rose-50/50 border-rose-300 font-semibold' : ''}`}
                             />
-                            {idDoador && (
+                            {(idDoador || doadorSearchQuery) && (
                                 <button
                                     type="button"
-                                    onClick={() => { setIdDoador(''); setDoadorSearchQuery(''); }}
-                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                                    onClick={() => { setIdDoador(''); setDoadorSearchQuery(''); setDropdownOpen(false); }}
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5 rounded-full hover:bg-gray-100 transition"
+                                    title="Limpar seleção"
                                 >
                                     <i data-lucide="x" className="w-4 h-4"></i>
                                 </button>
@@ -177,20 +195,23 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                         </div>
 
                         {dropdownOpen && (
-                            <div id="dropdown-doadores-form" className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
+                            <div id="dropdown-doadores-form" className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
                                 {doadoresFiltrados.length === 0 ? (
                                     <div className="p-4 text-center text-xs text-gray-400 font-medium">Nenhum doador encontrado.</div>
                                 ) : (
                                     doadoresFiltrados.map(d => (
                                         <div
                                             key={d.id_doador}
-                                            onMouseDown={() => { setIdDoador(d.id_doador); setDoadorSearchQuery(d.nome); setDropdownOpen(false); }}
+                                            onClick={() => { setIdDoador(d.id_doador); setDoadorSearchQuery(d.nome); setDropdownOpen(false); }}
                                             className="p-3 hover:bg-rose-50/80 cursor-pointer flex items-center justify-between border-b border-gray-50 last:border-0"
                                         >
                                             <div>
                                                 <div className="font-semibold text-sm text-slate-800">{d.nome}</div>
                                                 <div className="text-[11px] text-gray-500">Doc: {window.formatarDocumento(d.documento || '', d.tipo_doador)}</div>
                                             </div>
+                                            {idDoador === d.id_doador && (
+                                                <i data-lucide="check" className="w-4 h-4 text-rose-600 font-bold"></i>
+                                            )}
                                         </div>
                                     ))
                                 )}
@@ -235,7 +256,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                                 id="check-financeiro"
                                 checked={checkFinanceiro}
                                 onChange={(e) => setCheckFinanceiro(e.target.checked)}
-                                className="accent-rose-600 w-4 h-4 rounded"
+                                className="accent-rose-600 w-4 h-4 rounded cursor-pointer"
                             />
                             💰 Doação Financeira
                         </label>
@@ -245,7 +266,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                                 id="check-material"
                                 checked={checkMaterial}
                                 onChange={(e) => setCheckMaterial(e.target.checked)}
-                                className="accent-rose-600 w-4 h-4 rounded"
+                                className="accent-rose-600 w-4 h-4 rounded cursor-pointer"
                             />
                             📦 Doação Material / Física
                         </label>

@@ -63,8 +63,15 @@ select:focus,
 textarea:focus {
     outline: none;
     border-color: #e11d48 !important;
-    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.1) !important;
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15) !important;
+}
+
+/* Regras de foco por tema */
+.theme-light input:not(#global-password-input):focus,
+.theme-light select:focus,
+.theme-light textarea:focus {
     background-color: #ffffff !important;
+    color: #0f172a !important;
 }
 
 /* Barra de Progresso do Topo */
@@ -143,12 +150,13 @@ textarea:focus {
     color: #f8fafc !important;
 }
 
-/* Prevenção de Hovers Claros no Modo Escuro */
+/* Prevenção de Hovers e Focus Claros no Modo Escuro */
 .theme-dark .hover\:bg-gray-50:hover,
 .theme-dark .hover\:bg-gray-100:hover,
 .theme-dark .hover\:bg-slate-50:hover,
 .theme-dark .hover\:bg-slate-100:hover,
 .theme-dark .hover\:bg-rose-50:hover,
+.theme-dark .hover\:bg-rose-50\/80:hover,
 .theme-dark .hover\:bg-blue-50:hover,
 .theme-dark .hover\:bg-emerald-50:hover {
     background-color: #334155 !important;
@@ -164,6 +172,24 @@ textarea:focus {
 .theme-dark textarea {
     background-color: #0f172a !important;
     border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+.theme-dark input:focus,
+.theme-dark select:focus,
+.theme-dark textarea:focus {
+    background-color: #0f172a !important;
+    border-color: #e11d48 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.25) !important;
+}
+
+.theme-dark input::placeholder {
+    color: #64748b !important;
+}
+
+.theme-dark option {
+    background-color: #0f172a !important;
     color: #f8fafc !important;
 }
 
@@ -262,12 +288,13 @@ textarea:focus {
     color: #f1f5f9 !important;
 }
 
-/* Prevenção de Hovers Claros no Modo Visão Sensível */
+/* Prevenção de Hovers e Focus Claros no Modo Visão Sensível */
 .theme-ultra-dark .hover\:bg-gray-50:hover,
 .theme-ultra-dark .hover\:bg-gray-100:hover,
 .theme-ultra-dark .hover\:bg-slate-50:hover,
 .theme-ultra-dark .hover\:bg-slate-100:hover,
 .theme-ultra-dark .hover\:bg-rose-50:hover,
+.theme-ultra-dark .hover\:bg-rose-50\/80:hover,
 .theme-ultra-dark .hover\:bg-blue-50:hover,
 .theme-ultra-dark .hover\:bg-emerald-50:hover {
     background-color: #1e293b !important;
@@ -283,6 +310,24 @@ textarea:focus {
 .theme-ultra-dark textarea {
     background-color: #070c14 !important;
     border-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+
+.theme-ultra-dark input:focus,
+.theme-ultra-dark select:focus,
+.theme-ultra-dark textarea:focus {
+    background-color: #070c14 !important;
+    border-color: #e11d48 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.3) !important;
+}
+
+.theme-ultra-dark input::placeholder {
+    color: #64748b !important;
+}
+
+.theme-ultra-dark option {
+    background-color: #070c14 !important;
     color: #f8fafc !important;
 }
 
@@ -331,7 +376,7 @@ textarea:focus {
 
 .theme-ultra-dark .bg-sky-50,
 .theme-ultra-dark .bg-sky-50\/20 {
-    background-color: rgba(12, 74, 110, 0.3) !important;
+    background-color: rgba(14, 165, 233, 0.3) !important;
     border-color: rgba(14, 165, 233, 0.4) !important;
     color: #bae6fd !important;
 }

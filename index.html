@@ -350,7 +350,7 @@
         // ==========================================
         // 3. REACT CONTEXT PROVIDERS
         // ==========================================
-        const { createContext, useContext, useState, useEffect } = React;
+        const { createContext, useContext, useState, useEffect, useRef } = React;
 
         const AuthContext = createContext();
         function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
@@ -959,6 +959,18 @@
             const [matEstado, setMatEstado] = useState('Não se aplica');
             const [matDestino, setMatDestino] = useState('Estoque Geral');
 
+            const searchContainerRef = useRef(null);
+
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+                        setDropdownOpen(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, []);
+
             useEffect(() => { if (categorias.length > 0 && !matCategoria) setMatCategoria(categorias[0].id_categoria); }, [categorias]);
             useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, checkFinanceiro, checkMaterial, dropdownOpen]);
             if (!isVisible) return null;
@@ -967,6 +979,20 @@
                 const q = doadorSearchQuery.toLowerCase().trim();
                 return !q || d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q));
             });
+
+            const selecionarPreset = (tipo) => {
+                const presets = {
+                    'bazar': { catId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
+                    'alimentos': { catId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
+                    'higiene': { catId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+                    'cabelo': { catId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+                    'ortopedicos': { catId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
+                };
+                const p = presets[tipo];
+                if (!p) return;
+                setMatCategoria(p.catId); setMatDestino(p.destino); setMatUnidade(p.unidade); setMatEstado(p.estado); setMatDescricao(p.desc);
+                if (!matQtd || matQtd <= 0) setMatQtd(1);
+            };
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
@@ -981,7 +1007,7 @@
                     if (checkMaterial) await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: parseInt(matCategoria), descricao_item: matDescricao, quantidade: parseInt(matQtd), unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
 
                     mostrarToast('Doação registrada com sucesso!', 'success');
-                    setIdDoador(''); setDoadorSearchQuery(''); setCheckFinanceiro(false); setFinValor(''); setCheckMaterial(false); setMatDescricao('');
+                    setIdDoador(''); setDoadorSearchQuery(''); setCheckFinanceiro(false); setFinValor(''); setCheckMaterial(false); setMatDescricao(''); setDropdownOpen(false);
                     if (onDoacaoRegistrada) onDoacaoRegistrada();
                 } catch (err) { mostrarToast('Erro ao criar doação: ' + err.message, 'error'); }
                 finally { if (onLoadingEnd) onLoadingEnd(); }
@@ -989,17 +1015,29 @@
 
             return (
                 <div id="tab-doacao_mista" className="tab-content active visible bg-white p-6 rounded-2xl shadow-xs border border-gray-100">
-                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i data-lucide="gift" className="text-rose-600"></i> Registrar Nova Doação (Mista)</h2>
+                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i data-lucide="gift" className="text-rose-600"></i> Registrar Nova Doação (Mista / Financeira / Material)</h2>
                     <form id="form-doacao" onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="relative">
+                            <div className="relative" ref={searchContainerRef}>
                                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Pesquisar Doador *</label>
-                                <input type="text" value={doadorSearchQuery} onChange={(e) => { setDoadorSearchQuery(e.target.value); setDropdownOpen(true); }} onFocus={() => setDropdownOpen(true)} placeholder="Digite o nome..." className={`w-full px-4 py-2.5 rounded-xl border text-sm ${idDoador ? 'bg-rose-50/50 border-rose-300 font-semibold' : 'border-gray-200'}`} />
+                                <div className="relative">
+                                    <input type="text" autoComplete="off" value={doadorSearchQuery} onChange={(e) => { setDoadorSearchQuery(e.target.value); setDropdownOpen(true); }} onFocus={() => setDropdownOpen(true)} placeholder="Digite o nome..." className={`w-full px-4 py-2.5 rounded-xl border text-sm ${idDoador ? 'bg-rose-50/50 border-rose-300 font-semibold' : 'border-gray-200'}`} />
+                                    {(idDoador || doadorSearchQuery) && (
+                                        <button type="button" onClick={() => { setIdDoador(''); setDoadorSearchQuery(''); setDropdownOpen(false); }} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5 rounded-full hover:bg-gray-100 transition"><i data-lucide="x" className="w-4 h-4"></i></button>
+                                    )}
+                                </div>
                                 {dropdownOpen && (
-                                    <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
-                                        {doadoresFiltrados.map(d => (
-                                            <div key={d.id_doador} onMouseDown={() => { setIdDoador(d.id_doador); setDoadorSearchQuery(d.nome); setDropdownOpen(false); }} className="p-3 hover:bg-rose-50 cursor-pointer border-b border-gray-50 text-sm font-semibold">{d.nome}</div>
-                                        ))}
+                                    <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
+                                        {doadoresFiltrados.length === 0 ? (
+                                            <div className="p-4 text-center text-xs text-gray-400">Nenhum doador encontrado.</div>
+                                        ) : (
+                                            doadoresFiltrados.map(d => (
+                                                <div key={d.id_doador} onClick={() => { setIdDoador(d.id_doador); setDoadorSearchQuery(d.nome); setDropdownOpen(false); }} className="p-3 hover:bg-rose-50 cursor-pointer border-b border-gray-50 text-sm font-semibold flex justify-between items-center">
+                                                    <div><div>{d.nome}</div><div className="text-[11px] text-gray-500">Doc: {formatarDocumento(d.documento || '', d.tipo_doador)}</div></div>
+                                                    {idDoador === d.id_doador && <i data-lucide="check" className="w-4 h-4 text-rose-600"></i>}
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1008,29 +1046,52 @@
                                 <select value={canal} onChange={(e) => setCanal(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Presencial">Presencial (Sede)</option><option value="PIX">PIX / Banco</option><option value="Dinheiro">Dinheiro / Bazar</option></select>
                             </div>
                         </div>
-                        <div className="p-4 bg-gray-50 rounded-2xl flex gap-6">
-                            <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkFinanceiro} onChange={(e) => setCheckFinanceiro(e.target.checked)} className="accent-rose-600" /> 💰 Doação Financeira</label>
-                            <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkMaterial} onChange={(e) => setCheckMaterial(e.target.checked)} className="accent-rose-600" /> 📦 Doação Material</label>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Observações Internas</label>
+                            <input type="text" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Informações relevantes sobre a doação..." className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" />
                         </div>
+
+                        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex gap-6">
+                            <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkFinanceiro} onChange={(e) => setCheckFinanceiro(e.target.checked)} className="accent-rose-600 w-4 h-4 rounded cursor-pointer" /> 💰 Doação Financeira</label>
+                            <label className="flex items-center gap-2 font-semibold text-sm cursor-pointer"><input type="checkbox" checked={checkMaterial} onChange={(e) => setCheckMaterial(e.target.checked)} className="accent-rose-600 w-4 h-4 rounded cursor-pointer" /> 📦 Doação Material / Física</label>
+                        </div>
+
                         {checkFinanceiro && (
                             <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label><input type="number" step="0.01" value={finValor} onChange={(e) => setFinValor(e.target.value)} required placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
-                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nº Comprovante</label><input type="text" value={finComprovante} onChange={(e) => setFinComprovante(e.target.value)} placeholder="Ex: TX-984" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nº Comprovante / Transação</label><input type="text" value={finComprovante} onChange={(e) => setFinComprovante(e.target.value)} placeholder="Ex: TX-984201" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                             </div>
                         )}
+
                         {checkMaterial && (
                             <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-4">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Atalhos / Presets de Conteúdo</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button type="button" onClick={() => selecionarPreset('bazar')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-600 transition cursor-pointer">🛍️ Bazar</button>
+                                        <button type="button" onClick={() => selecionarPreset('alimentos')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-600 transition cursor-pointer">🍞 Alimentos</button>
+                                        <button type="button" onClick={() => selecionarPreset('higiene')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-600 transition cursor-pointer">🧴 Higiene</button>
+                                        <button type="button" onClick={() => selecionarPreset('cabelo')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-600 transition cursor-pointer">✨ Cabelo</button>
+                                        <button type="button" onClick={() => selecionarPreset('ortopedicos')} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-600 transition cursor-pointer">♿ Ortopédicos</button>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={matDescricao} onChange={(e) => setMatDescricao(e.target.value)} required placeholder="Ex: Cesta Básica" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={matDescricao} onChange={(e) => setMatDescricao(e.target.value)} required placeholder="Ex: Cesta Básica 15kg" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
                                     <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={matCategoria} onChange={(e) => setMatCategoria(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Quantidade *</label><input type="number" min="1" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
-                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={matDestino} onChange={(e) => setMatDestino(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade de Medida *</label><select value={matUnidade} onChange={(e) => setMatUnidade(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Pacote">Pacote (pct)</option><option value="Caixa">Caixa (cx)</option><option value="Litro">Litro (l)</option></select></div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Estado de Conservação *</label><select value={matEstado} onChange={(e) => setMatEstado(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Novo">Novo (Lacre de fábrica)</option><option value="Seminovo">Seminovo (Ótimo estado)</option><option value="Usado">Usado (Bom estado)</option><option value="Não se aplica">Não se aplica (Alimentos / Descartáveis)</option></select></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino Inicial *</label><select value={matDestino} onChange={(e) => setMatDestino(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar Beneficente</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
                                 </div>
                             </div>
                         )}
-                        <div className="pt-4 flex justify-end"><button type="submit" className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2"><i data-lucide="check-circle" className="w-5 h-5"></i> Registrar Doação</button></div>
+                        <div className="pt-4 flex justify-end"><button type="submit" className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2"><i data-lucide="check-circle" className="w-5 h-5"></i> Registrar Doação Completa</button></div>
                     </form>
                 </div>
             );
@@ -1107,20 +1168,36 @@
 
         function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
             const { mostrarToast } = useToast();
-            const [estoqueList, setEstoqueList] = useState([]);
+            const [estoqueSubTab, setEstoqueSubTab] = useState('Geral');
+            const [modoVisao, setModoVisao] = useState('consolidado');
             const [searchQuery, setSearchQuery] = useState('');
+            const [estoqueList, setEstoqueList] = useState([]);
+            const [estoqueDoacoesList, setEstoqueDoacoesList] = useState([]);
+            const [totalBazar, setTotalBazar] = useState(0);
+            const [totalAlimentos, setTotalAlimentos] = useState(0);
+            const [totalHigiene, setTotalHigiene] = useState(0);
+            const [totalItens, setTotalItens] = useState(0);
 
             const carregarEstoque = async () => {
                 if (onLoadingStart) onLoadingStart();
                 try {
-                    const { data } = await estoqueService.buscarEstoqueMateriais();
-                    setEstoqueList(data || []);
+                    const { data: matData } = await estoqueService.buscarEstoqueMateriais();
+                    const listMat = matData || [];
+                    setEstoqueList(listMat);
+
+                    const { data: doaData } = await estoqueService.buscarEstoqueDoacoesCanais();
+                    setEstoqueDoacoesList(doaData || []);
+
+                    setTotalBazar(listMat.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
+                    setTotalAlimentos(listMat.filter(m => m.id_categoria === 2).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
+                    setTotalHigiene(listMat.filter(m => m.id_categoria === 3).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
+                    setTotalItens(listMat.reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
                 } catch (e) { console.error(e); }
                 finally { if (onLoadingEnd) onLoadingEnd(); }
             };
 
             useEffect(() => { if (isVisible) carregarEstoque(); }, [isVisible]);
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueList, searchQuery]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueSubTab, modoVisao, searchQuery, estoqueList]);
             if (!isVisible) return null;
 
             const handlePDF = async () => {
@@ -1132,19 +1209,87 @@
                 finally { if (onLoadingEnd) onLoadingEnd(); }
             };
 
+            const isCanalTab = ['Presencial', 'PIX', 'Dinheiro'].includes(estoqueSubTab);
             const q = searchQuery.toLowerCase().trim();
-            const filtrados = estoqueList.filter(m => m.descricao_item.toLowerCase().includes(q) || m.destino_item.toLowerCase().includes(q));
+
+            let materiaisFiltrados = [];
+            if (estoqueSubTab === 'Geral') materiaisFiltrados = estoqueList;
+            else if (estoqueSubTab === 'Bazar') materiaisFiltrados = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6);
+            else {
+                const mapCat = { 'Alimentos': 2, 'Higiene': 3, 'Cabelo': 4, 'Ortopedicos': 5 };
+                materiaisFiltrados = estoqueList.filter(m => m.id_categoria === mapCat[estoqueSubTab]);
+            }
+
+            if (q) materiaisFiltrados = materiaisFiltrados.filter(m => m.descricao_item.toLowerCase().includes(q) || m.destino_item.toLowerCase().includes(q));
+
+            const gruposConsolidados = {};
+            if (modoVisao === 'consolidado') {
+                materiaisFiltrados.forEach(item => {
+                    const key = item.descricao_item.trim().toLowerCase() + '_' + item.unidade_medida;
+                    if (!gruposConsolidados[key]) {
+                        gruposConsolidados[key] = { key, descricao: item.descricao_item, quantidadeTotal: 0, unidade: item.unidade_medida, destino: item.destino_item, lotes: [] };
+                    }
+                    gruposConsolidados[key].quantidadeTotal += parseInt(item.quantidade || 0);
+                    gruposConsolidados[key].lotes.push(item);
+                });
+            }
 
             return (
                 <div id="tab-estoque" className="tab-content active visible space-y-6">
                     <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 flex justify-between items-center">
-                        <div><h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2"><i data-lucide="boxes" className="text-rose-600"></i> Controle de Estoque e Inventário</h2></div>
+                        <div><h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2"><i data-lucide="boxes" className="text-rose-600"></i> Controle Integrado de Estoque e Inventário</h2></div>
                         <button onClick={handlePDF} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-2 cursor-pointer"><i data-lucide="file-text" className="w-4 h-4 text-rose-400"></i> Baixar Relatório PDF</button>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="bg-white p-5 rounded-2xl border border-rose-100 bg-rose-50/20 flex items-center gap-4"><div className="p-3 bg-rose-100 text-rose-700 rounded-2xl"><i data-lucide="shopping-bag" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-rose-700 uppercase">Bazar</p><h3 className="text-xl font-extrabold mt-1">{totalBazar} un.</h3></div></div>
+                        <div className="bg-white p-5 rounded-2xl border border-amber-100 bg-amber-50/20 flex items-center gap-4"><div className="p-3 bg-amber-100 text-amber-700 rounded-2xl"><i data-lucide="apple" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-amber-700 uppercase">Alimentos</p><h3 className="text-xl font-extrabold mt-1">{totalAlimentos} un.</h3></div></div>
+                        <div className="bg-white p-5 rounded-2xl border border-sky-100 bg-sky-50/20 flex items-center gap-4"><div className="p-3 bg-sky-100 text-sky-700 rounded-2xl"><i data-lucide="droplet" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-sky-700 uppercase">Higiene</p><h3 className="text-xl font-extrabold mt-1">{totalHigiene} un.</h3></div></div>
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 flex items-center gap-4"><div className="p-3 bg-slate-100 text-slate-700 rounded-2xl"><i data-lucide="package" className="w-6 h-6"></i></div><div><p className="text-xs font-bold text-slate-500 uppercase">Total Geral</p><h3 className="text-xl font-extrabold mt-1">{totalItens} itens</h3></div></div>
+                    </div>
+
+                    <div className="space-y-4 mb-6 border-b border-gray-200 pb-6">
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={() => setEstoqueSubTab('Geral')} className={`px-4 py-2 text-xs font-bold rounded-xl border ${estoqueSubTab === 'Geral' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200'}`}>📦 Estoque Geral</button>
+                            <button onClick={() => setEstoqueSubTab('Bazar')} className={`px-3.5 py-2 text-xs font-medium rounded-xl border ${estoqueSubTab === 'Bazar' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200'}`}>🛍️ Bazar</button>
+                            <button onClick={() => setEstoqueSubTab('Alimentos')} className={`px-3.5 py-2 text-xs font-medium rounded-xl border ${estoqueSubTab === 'Alimentos' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-gray-600 border-gray-200'}`}>🍞 Alimentos</button>
+                            <button onClick={() => setEstoqueSubTab('Higiene')} className={`px-3.5 py-2 text-xs font-medium rounded-xl border ${estoqueSubTab === 'Higiene' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-gray-600 border-gray-200'}`}>🧴 Higiene</button>
+                            <button onClick={() => setEstoqueSubTab('Cabelo')} className={`px-3.5 py-2 text-xs font-medium rounded-xl border ${estoqueSubTab === 'Cabelo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-gray-600 border-gray-200'}`}>✨ Cabelo</button>
+                            <button onClick={() => setEstoqueSubTab('Ortopedicos')} className={`px-3.5 py-2 text-xs font-medium rounded-xl border ${estoqueSubTab === 'Ortopedicos' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-gray-600 border-gray-200'}`}>♿ Ortopédicos</button>
+                        </div>
+                    </div>
+
                     <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
-                        <div className="pb-4 border-b border-gray-100"><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar no estoque..." className="px-4 py-2 rounded-xl border border-gray-200 text-xs w-72" /></div>
-                        <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Descrição</th><th className="px-6 py-3.5">Quantidade</th><th className="px-6 py-3.5">Unidade</th><th className="px-6 py-3.5">Destino</th><th className="px-6 py-3.5 text-center">Ações</th></tr></thead><tbody className="divide-y divide-gray-100 text-xs">{filtrados.map(m => (<tr key={m.id_material} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{m.descricao_item}</td><td className="px-6 py-4 font-bold">{m.quantidade}</td><td className="px-6 py-4">{m.unidade_medida}</td><td className="px-6 py-4">{m.destino_item}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoque(m)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar itens no estoque..." className="px-4 py-2 rounded-xl border border-gray-200 text-xs w-72" />
+                            <div className="flex gap-2 bg-slate-100 p-1 rounded-xl text-xs">
+                                <button onClick={() => setModoVisao('consolidado')} className={`px-3 py-1.5 rounded-lg font-semibold ${modoVisao === 'consolidado' ? 'bg-rose-600 text-white' : 'text-slate-600'}`}>Consolidado</button>
+                                <button onClick={() => setModoVisao('lotes')} className={`px-3 py-1.5 rounded-lg font-semibold ${modoVisao === 'lotes' ? 'bg-rose-600 text-white' : 'text-slate-600'}`}>Lotes</button>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    {modoVisao === 'consolidado' ? (
+                                        <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Item Consolidado</th><th className="px-6 py-3.5 text-center">Total Acumulado</th><th className="px-6 py-3.5">Unidade</th><th className="px-6 py-3.5">Destino</th><th className="px-6 py-3.5 text-center">Ações</th></tr>
+                                    ) : (
+                                        <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Descrição</th><th className="px-6 py-3.5 text-center">Quantidade</th><th className="px-6 py-3.5">Unidade</th><th className="px-6 py-3.5">Destino</th><th className="px-6 py-3.5 text-center">Ações</th></tr>
+                                    )}
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-xs">
+                                    {modoVisao === 'consolidado' ? (
+                                        Object.values(gruposConsolidados).map(g => (
+                                            <tr key={g.key} className="hover:bg-gray-50"><td className="px-6 py-4 font-bold">{g.descricao}</td><td className="px-6 py-4 text-center font-extrabold text-rose-600">{g.quantidadeTotal}</td><td className="px-6 py-4">{g.unidade}</td><td className="px-6 py-4">{g.destino}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoqueConsolidado(g)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
+                                        ))
+                                    ) : (
+                                        materiaisFiltrados.map(m => (
+                                            <tr key={m.id_material} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium">{m.descricao_item}</td><td className="px-6 py-4 text-center font-bold">{m.quantidade}</td><td className="px-6 py-4">{m.unidade_medida}</td><td className="px-6 py-4">{m.destino_item}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoque(m)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             );
