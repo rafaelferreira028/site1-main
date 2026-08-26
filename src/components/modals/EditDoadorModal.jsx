@@ -47,7 +47,7 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
 
     return (
         <div id="modal-editar-doador" className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay show bg-slate-900/40 backdrop-blur-xs">
-            <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 modal-dialog show relative overflow-hidden">
+            <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 modal-dialog show relative overflow-hidden">
                 <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
                     <div className="flex items-center gap-2">
                         <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">

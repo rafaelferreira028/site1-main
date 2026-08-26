@@ -4,6 +4,20 @@
     font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
+html {
+    font-size: 16.5px;
+}
+
+body {
+    font-size: 0.975rem;
+    line-height: 1.6;
+}
+
+#app-container {
+    transition: max-width 0.3s ease;
+}
+
+
 /* Transições de abas */
 .tab-content {
     display: none;

@@ -73,7 +73,7 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
     };
 
     return (
-        <div id="app-container" className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+        <div id="app-container" className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
             <Header />
             <Navbar activeTab={activeTab} onSwitchTab={setActiveTab} />
             <main className="pt-2">
