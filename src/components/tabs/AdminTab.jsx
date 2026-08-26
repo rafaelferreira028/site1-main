@@ -5,6 +5,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
 
     const [adminSubTab, setAdminSubTab] = useState('doadores');
     const [searchQuery, setSearchQuery] = useState('');
+    const [expandedDoadorId, setExpandedDoadorId] = useState(null);
 
     const [doadoresList, setDoadoresList] = useState([]);
     const [doacoesList, setDoacoesList] = useState([]);
@@ -65,7 +66,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData]);
+    }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId]);
 
     if (!isVisible) return null;
 
@@ -105,30 +106,62 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
         }
     };
 
+    const handleExportarPDF = async () => {
+        if (onLoadingStart) onLoadingStart();
+        try {
+            const res = await window.pdfService.exportarPDFDoacoesOficial();
+            if (res && res.success) {
+                mostrarToast('Relatório PDF de Doações baixado com sucesso!', 'success');
+            } else if (res && res.message) {
+                mostrarToast(res.message, 'warning');
+            }
+        } catch (err) {
+            mostrarToast('Erro ao gerar PDF: ' + err.message, 'error');
+        } finally {
+            if (onLoadingEnd) onLoadingEnd();
+        }
+    };
+
     const query = searchQuery.toLowerCase().trim();
 
-    const doadoresFiltrados = doadoresList.filter(doador =>
-        doador.nome.toLowerCase().includes(query) ||
-        (doador.documento && doador.documento.includes(query)) ||
-        (doador.email && doador.email.toLowerCase().includes(query)) ||
-        (doador.telefone && doador.telefone.includes(query)) ||
-        (doador.cidade && doador.cidade.toLowerCase().includes(query)) ||
-        (doador.data_nascimento && doador.data_nascimento.includes(query))
-    );
+    const doadoresFiltrados = doadoresList.filter(doador => {
+        const basicMatch = doador.nome.toLowerCase().includes(query) ||
+            (doador.documento && doador.documento.includes(query)) ||
+            (doador.email && doador.email.toLowerCase().includes(query)) ||
+            (doador.telefone && doador.telefone.includes(query)) ||
+            (doador.cidade && doador.cidade.toLowerCase().includes(query)) ||
+            (doador.data_nascimento && doador.data_nascimento.includes(query));
+
+        if (!query) return true;
+        if (basicMatch) return true;
+
+        const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador);
+        return doacoesDoDoador.some(doacao => {
+            const canalMatch = doacao.canal_recebimento && doacao.canal_recebimento.toLowerCase().includes(query);
+            const obsMatch = doacao.observacoes && doacao.observacoes.toLowerCase().includes(query);
+            let finMatch = false;
+            if (doacao.doacoes_financeiras) {
+                finMatch = doacao.doacoes_financeiras.some(f => String(f.valor).includes(query) || (f.comprovante_transacao && f.comprovante_transacao.toLowerCase().includes(query)));
+            }
+            let matMatch = false;
+            if (doacao.doacoes_materiais) {
+                matMatch = doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
+            }
+            return canalMatch || obsMatch || finMatch || matMatch;
+        });
+    });
 
     const doacoesFiltradas = doacoesList.filter(doacao => {
         const nomeDoador = doacao.doadores ? doacao.doadores.nome.toLowerCase() : '';
-        const canal = doacao.canal_recebimento.toLowerCase();
+        const canal = doacao.canal_recebimento ? doacao.canal_recebimento.toLowerCase() : '';
         const obs = doacao.observacoes ? doacao.observacoes.toLowerCase() : '';
 
         let detMatch = false;
         if (doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0) {
-            detMatch = detMatch || String(doacao.doacoes_financeiras[0].valor).includes(query) ||
-                (doacao.doacoes_financeiras[0].comprovante_transacao && doacao.doacoes_financeiras[0].comprovante_transacao.toLowerCase().includes(query));
+            detMatch = detMatch || doacao.doacoes_financeiras.some(f => String(f.valor).includes(query) || (f.comprovante_transacao && f.comprovante_transacao.toLowerCase().includes(query)));
         }
         if (doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0) {
-            detMatch = detMatch || doacao.doacoes_materiais[0].descricao_item.toLowerCase().includes(query) ||
-                doacao.doacoes_materiais[0].destino_item.toLowerCase().includes(query);
+            detMatch = detMatch || doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
         }
 
         return nomeDoador.includes(query) || canal.includes(query) || obs.includes(query) || detMatch;
@@ -199,16 +232,25 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                         </button>
                     </div>
 
-                    <div className="relative flex-1 md:max-w-xs">
-                        <i data-lucide="search" className="w-4 h-4 absolute left-3.5 top-3 text-gray-400"></i>
-                        <input
-                            type="text"
-                            id="admin-search"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Buscar registros..."
-                            className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs focus:border-rose-500"
-                        />
+                    <div className="flex items-center gap-3">
+                        <div className="relative flex-1 md:w-64">
+                            <i data-lucide="search" className="w-4 h-4 absolute left-3.5 top-3 text-gray-400"></i>
+                            <input
+                                type="text"
+                                id="admin-search"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Buscar doador, item ou valor..."
+                                className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs focus:border-rose-500"
+                            />
+                        </div>
+                        <button
+                            onClick={handleExportarPDF}
+                            className="bg-rose-600 text-white hover:bg-rose-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs whitespace-nowrap"
+                            title="Baixar Relatório Oficial de Doações em PDF"
+                        >
+                            <i data-lucide="file-text" className="w-4 h-4"></i> Relatório PDF
+                        </button>
                     </div>
                 </div>
 
@@ -221,17 +263,16 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                     <th className="px-6 py-3.5">Nome Completo / Razão Social</th>
                                     <th className="px-6 py-3.5">Tipo</th>
                                     <th className="px-6 py-3.5">Documento (CPF/CNPJ)</th>
+                                    <th className="px-6 py-3.5">O que doou (Resumo & Detalhes)</th>
                                     <th className="px-6 py-3.5">Cidade</th>
-                                    <th className="px-6 py-3.5">Data Nasc./Fund.</th>
-                                    <th className="px-6 py-3.5">Telefone</th>
-                                    <th className="px-6 py-3.5">E-mail</th>
+                                    <th className="px-6 py-3.5">Telefone / E-mail</th>
                                     <th className="px-6 py-3.5 text-center">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="tabela-doadores-body" className="divide-y divide-gray-100 text-xs">
                                 {loadingData ? (
                                     <tr>
-                                        <td colSpan="8" className="px-6 py-10 text-center text-gray-400">
+                                        <td colSpan="7" className="px-6 py-10 text-center text-gray-400">
                                             <div className="flex flex-col items-center justify-center gap-3">
                                                 <div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin"></div>
                                                 <span className="text-xs font-medium text-gray-500 animate-pulse">Carregando dados com segurança...</span>
@@ -239,29 +280,127 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                         </td>
                                     </tr>
                                 ) : doadoresFiltrados.length === 0 ? (
-                                    <tr><td colSpan="8" className="px-6 py-8 text-center text-gray-500">Nenhum doador cadastrado ou encontrado.</td></tr>
+                                    <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Nenhum doador cadastrado ou encontrado.</td></tr>
                                 ) : (
-                                    doadoresFiltrados.map(doador => (
-                                        <tr key={doador.id_doador} className="hover:bg-gray-50 border-b border-gray-200 transition duration-150">
-                                            <td className="px-6 py-4 font-medium text-gray-900">{doador.nome}</td>
-                                            <td className="px-6 py-4 text-xs font-semibold text-gray-500">{doador.tipo_doador === 'PF' ? 'Pessoa Física (PF)' : 'Pessoa Jurídica (PJ)'}</td>
-                                            <td className="px-6 py-4 font-mono text-xs">{window.formatarDocumento(doador.documento || '', doador.tipo_doador) || '-'}</td>
-                                            <td className="px-6 py-4 text-xs">{doador.cidade || '-'}</td>
-                                            <td className="px-6 py-4 text-xs font-mono">{window.formatarDataBR(doador.data_nascimento)}</td>
-                                            <td className="px-6 py-4 text-xs">{window.formatarTelefone(doador.telefone || '') || '-'}</td>
-                                            <td className="px-6 py-4 text-xs">{doador.email || '-'}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex justify-center gap-2">
-                                                    <button onClick={() => onOpenEditDoador(doador)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Doador">
-                                                        <i data-lucide="pencil" className="w-4 h-4"></i>
-                                                    </button>
-                                                    <button onClick={() => handleDeleteDoador(doador.id_doador, doador.nome)} className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Excluir Doador">
-                                                        <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    doadoresFiltrados.map(doador => {
+                                        const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador);
+                                        let totFinDoador = 0;
+                                        let matItemsDoador = [];
+
+                                        doacoesDoDoador.forEach(d => {
+                                            if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) {
+                                                d.doacoes_financeiras.forEach(f => {
+                                                    totFinDoador += parseFloat(f.valor || 0);
+                                                });
+                                            }
+                                            if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {
+                                                d.doacoes_materiais.forEach(m => {
+                                                    matItemsDoador.push(m);
+                                                });
+                                            }
+                                        });
+
+                                        const isExpanded = expandedDoadorId === doador.id_doador;
+
+                                        return (
+                                            <React.Fragment key={doador.id_doador}>
+                                                <tr className={`hover:bg-gray-50 border-b border-gray-200 transition duration-150 ${isExpanded ? 'bg-rose-50/20' : ''}`}>
+                                                    <td className="px-6 py-4 font-medium text-gray-900">{doador.nome}</td>
+                                                    <td className="px-6 py-4 text-xs font-semibold text-gray-500">{doador.tipo_doador === 'PF' ? 'PF' : 'PJ'}</td>
+                                                    <td className="px-6 py-4 font-mono text-xs">{window.formatarDocumento(doador.documento || '', doador.tipo_doador) || '-'}</td>
+                                                    <td className="px-6 py-4 text-xs">
+                                                        {doacoesDoDoador.length === 0 ? (
+                                                            <span className="text-gray-400 italic">Sem doações</span>
+                                                        ) : (
+                                                            <div className="space-y-1 max-w-xs">
+                                                                <div className="flex flex-wrap items-center gap-1">
+                                                                    {totFinDoador > 0 && (
+                                                                        <span className="bg-emerald-100 text-emerald-800 text-[11px] px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                                                            <i data-lucide="dollar-sign" className="w-3 h-3"></i> {window.formatarMoeda(totFinDoador)}
+                                                                        </span>
+                                                                    )}
+                                                                    {matItemsDoador.length > 0 && (
+                                                                        <span className="bg-blue-100 text-blue-800 text-[11px] px-2 py-0.5 rounded font-medium flex items-center gap-1" title={matItemsDoador.map(m => `${m.descricao_item} (${m.quantidade} ${m.unidade_medida})`).join(', ')}>
+                                                                            <i data-lucide="package" className="w-3 h-3"></i> {matItemsDoador.reduce((a, m) => a + parseInt(m.quantidade || 0), 0)} itens
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => setExpandedDoadorId(isExpanded ? null : doador.id_doador)}
+                                                                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer pt-0.5"
+                                                                >
+                                                                    <i data-lucide={isExpanded ? "chevron-up" : "chevron-down"} className="w-3 h-3"></i>
+                                                                    {isExpanded ? 'Ocultar doações' : `Ver doações (${doacoesDoDoador.length})`}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs">{doador.cidade || '-'}</td>
+                                                    <td className="px-6 py-4 text-xs">
+                                                        <div>{window.formatarTelefone(doador.telefone || '') || '-'}</div>
+                                                        {doador.email && <div className="text-[11px] text-gray-500">{doador.email}</div>}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="flex justify-center gap-2">
+                                                            <button onClick={() => onOpenEditDoador(doador)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Cadastro do Doador">
+                                                                <i data-lucide="pencil" className="w-4 h-4"></i>
+                                                            </button>
+                                                            <button onClick={() => handleDeleteDoador(doador.id_doador, doador.nome)} className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Excluir Doador">
+                                                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && (
+                                                    <tr className="bg-rose-50/30 border-b border-rose-100">
+                                                        <td colSpan="7" className="px-6 py-3">
+                                                            <div className="bg-white p-4 rounded-xl border border-rose-200/80 shadow-xs space-y-3">
+                                                                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                                                    <h4 className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                                                                        <i data-lucide="gift" className="w-4 h-4 text-rose-600"></i>
+                                                                        Histórico de Doações de <span className="text-rose-600 font-extrabold">{doador.nome}</span>
+                                                                    </h4>
+                                                                    <span className="text-[11px] text-gray-500 font-medium">{doacoesDoDoador.length} evento(s) de doação</span>
+                                                                </div>
+                                                                <div className="divide-y divide-gray-100 text-xs">
+                                                                    {doacoesDoDoador.map((doa, idx) => (
+                                                                        <div key={doa.id_doacao || idx} className="py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-gray-400 font-mono text-[11px]">#{idx + 1}</span>
+                                                                                <span className="bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700">
+                                                                                    {new Date(doa.data_doacao).toLocaleDateString('pt-BR')}
+                                                                                </span>
+                                                                                <span className="text-gray-500 text-[11px]">Via: <strong>{doa.canal_recebimento}</strong></span>
+                                                                            </div>
+                                                                            <div className="flex-1 space-y-1">
+                                                                                {doa.doacoes_financeiras && doa.doacoes_financeiras.map((f, i) => (
+                                                                                    <div key={i} className="text-emerald-700 font-bold flex items-center gap-1.5">
+                                                                                        <span>💰 Valor: {window.formatarMoeda(f.valor)}</span>
+                                                                                        {f.comprovante_transacao && <span className="text-gray-500 font-mono text-[11px] font-normal">(Nº {f.comprovante_transacao})</span>}
+                                                                                    </div>
+                                                                                ))}
+                                                                                {doa.doacoes_materiais && doa.doacoes_materiais.map((m, i) => (
+                                                                                    <div key={i} className="text-slate-800 font-medium">
+                                                                                        <span>📦 Item: <strong>{m.descricao_item}</strong> ({m.quantidade} {m.unidade_medida})</span>
+                                                                                        <span className="text-gray-500 text-[11px] ml-2">Destino: {m.destino_item} | Estado: {m.estado_conservacao}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                            {doa.observacoes && (
+                                                                                <div className="text-[11px] text-gray-500 italic max-w-xs truncate" title={doa.observacoes}>
+                                                                                    Obs: {doa.observacoes}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -277,7 +416,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                     <th className="px-6 py-3.5">Doador Vinculado</th>
                                     <th className="px-6 py-3.5">Canal</th>
                                     <th className="px-6 py-3.5">Tipo de Doação</th>
-                                    <th className="px-6 py-3.5">Detalhes / Valores</th>
+                                    <th className="px-6 py-3.5">Detalhes / Valores Completos</th>
                                     <th className="px-6 py-3.5">Observações</th>
                                     <th className="px-6 py-3.5">Data Doação</th>
                                     <th className="px-6 py-3.5 text-center">Ações</th>
@@ -301,10 +440,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                         const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
 
                                         const hasFin = doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0;
-                                        const fin = hasFin ? doacao.doacoes_financeiras[0] : null;
-
                                         const hasMat = doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0;
-                                        const mat = hasMat ? doacao.doacoes_materiais[0] : null;
 
                                         return (
                                             <tr key={doacao.id_doacao} className="hover:bg-gray-50 border-b border-gray-200 transition duration-150">
@@ -313,20 +449,29 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                                 <td className="px-6 py-4">
                                                     <div className="flex flex-wrap items-center gap-1">
                                                         {hasFin && <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded font-medium">Financeira</span>}
-                                                        {hasFin && <span className="text-xs text-gray-500 font-mono">({fin.comprovante_transacao || 'Sem comprovante'})</span>}
                                                         {hasMat && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-medium">Material</span>}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-xs leading-relaxed">
-                                                    {hasFin && (
-                                                        <div><strong>{window.formatarMoeda(fin.valor)}</strong></div>
-                                                    )}
-                                                    {hasMat && (
-                                                        <div>
-                                                            <span>Item: {mat.descricao_item} ({mat.quantidade} {mat.unidade_medida})</span>
-                                                            <span className="text-xs block text-gray-500">Destino: {mat.destino_item} | Estado: {mat.estado_conservacao}</span>
+                                                <td className="px-6 py-4 text-xs leading-relaxed space-y-1.5">
+                                                    {hasFin && doacao.doacoes_financeiras.map((fin, fIdx) => (
+                                                        <div key={fIdx} className="text-emerald-700 font-bold flex items-center gap-1">
+                                                            <span>💰 {window.formatarMoeda(fin.valor)}</span>
+                                                            {fin.comprovante_transacao && <span className="text-gray-500 font-mono text-[11px] font-normal">(Nº {fin.comprovante_transacao})</span>}
                                                         </div>
-                                                    )}
+                                                    ))}
+                                                    {hasMat && doacao.doacoes_materiais.map((mat, mIdx) => (
+                                                        <div key={mIdx} className="bg-slate-50 p-2 rounded-lg border border-slate-100 space-y-0.5">
+                                                            <div className="font-semibold text-slate-800 flex items-center gap-1">
+                                                                <span>📦 {mat.descricao_item}</span>
+                                                                <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.2 rounded font-mono ml-1">{mat.quantidade} {mat.unidade_medida}</span>
+                                                            </div>
+                                                            <div className="text-[11px] text-gray-500 flex gap-2">
+                                                                <span>Destino: <strong>{mat.destino_item}</strong></span>
+                                                                <span>•</span>
+                                                                <span>Estado: <strong>{mat.estado_conservacao}</strong></span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </td>
                                                 <td className="px-6 py-4 max-w-[150px] truncate text-xs" title={doacao.observacoes || ''}>{doacao.observacoes || '-'}</td>
                                                 <td className="px-6 py-4 text-xs whitespace-nowrap">{dataFmt}</td>

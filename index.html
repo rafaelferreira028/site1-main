@@ -344,6 +344,81 @@
                 const nomeArquivo = `Relatorio_Estoque_RedeCombateCancer_${dataFormatada.replace(/\//g, '-')}.pdf`;
                 doc.save(nomeArquivo);
                 return { success: true, filename: nomeArquivo };
+            },
+            exportarPDFDoacoesOficial: async () => {
+                if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("jsPDF não disponível");
+                const { data: doaData, error } = await doacoesService.buscarDoacoesAdmin();
+                if (error) throw error;
+                const doacoes = doaData || [];
+                if (doacoes.length === 0) return { success: false, message: "Não há registros de doações para gerar PDF." };
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const agora = new Date();
+                const dataFormatada = agora.toLocaleDateString('pt-BR');
+                const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                doc.setFillColor(225, 29, 72);
+                doc.rect(0, 0, 297, 24, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(16);
+                doc.text("REDE DE COMBATE AO CÂNCER DE CATANDUVA", 14, 12);
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(10);
+                doc.text("RELATÓRIO GERAL DE DOAÇÕES E DOADORES", 14, 18);
+                doc.setFontSize(9);
+                doc.text(`Gerado em: ${dataFormatada} às ${horaFormatada}`, 283, 15, { align: 'right' });
+
+                let totalFin = 0; let totalMatQtd = 0; const doadoresSet = new Set();
+                doacoes.forEach(d => {
+                    if (d.doadores && d.doadores.nome) doadoresSet.add(d.doadores.nome);
+                    if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => { totalFin += parseFloat(f.valor || 0); });
+                    if (d.doacoes_materiais) d.doacoes_materiais.forEach(m => { totalMatQtd += parseInt(m.quantidade || 0); });
+                });
+
+                doc.setFillColor(248, 250, 252);
+                doc.setDrawColor(226, 232, 240);
+                doc.roundedRect(14, 28, 269, 14, 2, 2, 'FD');
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(51, 65, 85);
+                doc.text(`TOTAL DOAÇÕES: ${doacoes.length}`, 20, 36.5);
+                doc.text(`DOADORES ÚNICOS: ${doadoresSet.size}`, 85, 36.5);
+                doc.text(`TOTAL FINANCEIRO: R$ ${totalFin.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 36.5);
+                doc.text(`TOTAL MATERIAIS: ${totalMatQtd} itens`, 230, 36.5);
+
+                const tableRows = doacoes.map((d, index) => {
+                    const nomeDoador = d.doadores ? d.doadores.nome : 'Doador Desconhecido';
+                    const dataDoacaoFmt = d.data_doacao ? new Date(d.data_doacao).toLocaleDateString('pt-BR') : '-';
+                    const detalhesArr = [];
+                    if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => detalhesArr.push(`[Fin] R$ ${parseFloat(f.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${f.comprovante_transacao ? ` (Nº ${f.comprovante_transacao})` : ''}`));
+                    if (d.doacoes_materiais) d.doacoes_materiais.forEach(m => detalhesArr.push(`[Mat] ${m.descricao_item} - ${m.quantidade} ${m.unidade_medida} (${m.destino_item || 'Estoque'})`));
+                    return [index + 1, nomeDoador, dataDoacaoFmt, d.canal_recebimento || 'Presencial', detalhesArr.join(' | ') || 'Sem detalhes', d.observacoes || '-'];
+                });
+
+                doc.autoTable({
+                    startY: 46,
+                    head: [['#', 'Doador', 'Data', 'Canal', 'O que foi doado (Valores e Itens)', 'Observações']],
+                    body: tableRows,
+                    theme: 'striped',
+                    headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
+                    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 55, fontStyle: 'bold' }, 2: { cellWidth: 22, halign: 'center' }, 3: { cellWidth: 30 }, 4: { cellWidth: 102 }, 5: { cellWidth: 50 } },
+                    bodyStyles: { fontSize: 8.5, textColor: [30, 41, 59] },
+                    alternateRowStyles: { fillColor: [252, 252, 253] },
+                    margin: { left: 14, right: 14 },
+                    didDrawPage: function (data) {
+                        const pageCount = doc.internal.getNumberOfPages();
+                        doc.setFontSize(8);
+                        doc.setTextColor(148, 163, 184);
+                        doc.text(`Página ${data.pageNumber} de ${pageCount}`, 283, 202, { align: 'right' });
+                        doc.text(`Rede de Combate ao Câncer - Sistema de Gestão de Doações e Estoque`, 14, 202);
+                    }
+                });
+
+                const nomeArquivo = `Relatorio_Doacoes_RedeCombateCancer_${dataFormatada.replace(/\//g, '-')}.pdf`;
+                doc.save(nomeArquivo);
+                return { success: true, filename: nomeArquivo };
             }
         };
 
@@ -1101,42 +1176,126 @@
             const { mostrarToast } = useToast();
             const [adminSubTab, setAdminSubTab] = useState('doadores');
             const [searchQuery, setSearchQuery] = useState('');
+            const [expandedDoadorId, setExpandedDoadorId] = useState(null);
+
             const [doadoresList, setDoadoresList] = useState([]);
             const [doacoesList, setDoacoesList] = useState([]);
+            const [loadingData, setLoadingData] = useState(false);
+
             const [metricDoadores, setMetricDoadores] = useState(0);
             const [metricDoacoes, setMetricDoacoes] = useState(0);
             const [metricFinanceiro, setMetricFinanceiro] = useState(0);
             const [metricMateriais, setMetricMateriais] = useState(0);
 
+            const carregarMetricas = async () => {
+                if (!supabaseClient) return;
+                try {
+                    const { count: doadoresCount } = await supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
+                    const { count: doacoesCount } = await supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
+                    const { data: finData } = await supabaseClient.from('doacoes_financeiras').select('valor');
+                    const totalFin = finData ? finData.reduce((acc, r) => acc + parseFloat(r.valor || 0), 0) : 0;
+                    const { data: matData } = await supabaseClient.from('doacoes_materiais').select('quantidade');
+                    const totalMat = matData ? matData.reduce((acc, r) => acc + parseInt(r.quantidade || 0), 0) : 0;
+
+                    setMetricDoadores(doadoresCount || 0);
+                    setMetricDoacoes(doacoesCount || 0);
+                    setMetricFinanceiro(totalFin);
+                    setMetricMateriais(totalMat);
+                } catch (e) { console.error(e); }
+            };
+
             const carregarDadosAdmin = async () => {
+                setLoadingData(true);
                 if (onLoadingStart) onLoadingStart();
                 try {
+                    await carregarMetricas();
                     const { data: dData } = await doadoresService.buscarDoadoresTodos();
                     setDoadoresList(dData || []);
-                    setMetricDoadores(dData ? dData.length : 0);
 
                     const { data: doaData } = await doacoesService.buscarDoacoesAdmin();
                     setDoacoesList(doaData || []);
-                    setMetricDoacoes(doaData ? doaData.length : 0);
-
-                    let totFin = 0; let totMat = 0;
-                    (doaData || []).forEach(d => {
-                        if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) totFin += parseFloat(d.doacoes_financeiras[0].valor || 0);
-                        if (d.doacoes_materiais && d.doacoes_materiais.length > 0) totMat += parseInt(d.doacoes_materiais[0].quantidade || 0);
-                    });
-                    setMetricFinanceiro(totFin);
-                    setMetricMateriais(totMat);
                 } catch (e) { console.error(e); }
-                finally { if (onLoadingEnd) onLoadingEnd(); }
+                finally {
+                    setLoadingData(false);
+                    if (onLoadingEnd) onLoadingEnd();
+                }
             };
 
             useEffect(() => { if (isVisible) carregarDadosAdmin(); }, [isVisible]);
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId]);
             if (!isVisible) return null;
 
-            const q = searchQuery.toLowerCase().trim();
-            const doadoresFiltrados = doadoresList.filter(d => d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q)));
-            const doacoesFiltradas = doacoesList.filter(d => (d.doadores && d.doadores.nome.toLowerCase().includes(q)) || d.canal_recebimento.toLowerCase().includes(q));
+            const handleDeleteDoador = async (idDoador, nome) => {
+                if (!confirm(`ATENÇÃO: Ao excluir o doador "${nome}", TODAS as doações vinculadas a ele serão excluídas permanentemente! Deseja continuar?`)) return;
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    await doadoresService.deletarDoadorCascata(idDoador);
+                    mostrarToast('Doador e doações associadas deletados com sucesso!', 'success');
+                    await carregarDadosAdmin();
+                    if (onDataChanged) onDataChanged();
+                } catch (error) { mostrarToast('Erro ao excluir doador: ' + error.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            const handleDeleteDoacao = async (idDoacao) => {
+                if (!confirm('Deseja realmente excluir esta doação permanentemente?')) return;
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    await doacoesService.deletarDoacaoCompleta(idDoacao);
+                    mostrarToast('Doação excluída com sucesso!', 'success');
+                    await carregarDadosAdmin();
+                    if (onDataChanged) onDataChanged();
+                } catch (error) { mostrarToast('Erro ao excluir doação: ' + error.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            const handleExportarPDF = async () => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const res = await pdfService.exportarPDFDoacoesOficial();
+                    if (res && res.success) mostrarToast('Relatório PDF baixado com sucesso!', 'success');
+                    else if (res && res.message) mostrarToast(res.message, 'warning');
+                } catch (err) { mostrarToast('Erro ao gerar PDF: ' + err.message, 'error'); }
+                finally { if (onLoadingEnd) onLoadingEnd(); }
+            };
+
+            const query = searchQuery.toLowerCase().trim();
+
+            const doadoresFiltrados = doadoresList.filter(doador => {
+                const basicMatch = doador.nome.toLowerCase().includes(query) ||
+                    (doador.documento && doador.documento.includes(query)) ||
+                    (doador.email && doador.email.toLowerCase().includes(query)) ||
+                    (doador.telefone && doador.telefone.includes(query)) ||
+                    (doador.cidade && doador.cidade.toLowerCase().includes(query));
+
+                if (!query) return true;
+                if (basicMatch) return true;
+
+                const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador);
+                return doacoesDoDoador.some(doacao => {
+                    const canalMatch = doacao.canal_recebimento && doacao.canal_recebimento.toLowerCase().includes(query);
+                    const obsMatch = doacao.observacoes && doacao.observacoes.toLowerCase().includes(query);
+                    let finMatch = false;
+                    if (doacao.doacoes_financeiras) finMatch = doacao.doacoes_financeiras.some(f => String(f.valor).includes(query) || (f.comprovante_transacao && f.comprovante_transacao.toLowerCase().includes(query)));
+                    let matMatch = false;
+                    if (doacao.doacoes_materiais) matMatch = doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
+                    return canalMatch || obsMatch || finMatch || matMatch;
+                });
+            });
+
+            const doacoesFiltradas = doacoesList.filter(doacao => {
+                const nomeDoador = doacao.doadores ? doacao.doadores.nome.toLowerCase() : '';
+                const canal = doacao.canal_recebimento ? doacao.canal_recebimento.toLowerCase() : '';
+                const obs = doacao.observacoes ? doacao.observacoes.toLowerCase() : '';
+                let detMatch = false;
+                if (doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0) {
+                    detMatch = detMatch || doacao.doacoes_financeiras.some(f => String(f.valor).includes(query) || (f.comprovante_transacao && f.comprovante_transacao.toLowerCase().includes(query)));
+                }
+                if (doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0) {
+                    detMatch = detMatch || doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
+                }
+                return nomeDoador.includes(query) || canal.includes(query) || obs.includes(query) || detMatch;
+            });
 
             return (
                 <div id="tab-admin" className="tab-content active visible space-y-6">
@@ -1148,18 +1307,181 @@
                     </div>
 
                     <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
-                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                            <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-                                <button onClick={() => setAdminSubTab('doadores')} className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer ${adminSubTab === 'doadores' ? 'bg-white shadow-xs text-gray-800' : 'text-gray-500'}`}>Doadores</button>
-                                <button onClick={() => setAdminSubTab('doacoes')} className={`px-4 py-2 text-xs font-bold rounded-lg cursor-pointer ${adminSubTab === 'doacoes' ? 'bg-white shadow-xs text-gray-800' : 'text-gray-500'}`}>Doações</button>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                            <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-xl">
+                                <button onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); }} className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 ${adminSubTab === 'doadores' ? 'bg-white shadow-xs text-gray-800' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="users" className="w-4 h-4"></i> Tabela de Doadores</button>
+                                <button onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); }} className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 ${adminSubTab === 'doacoes' ? 'bg-white shadow-xs text-gray-800' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="heart-handshake" className="w-4 h-4"></i> Histórico de Doações</button>
                             </div>
-                            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar registros..." className="px-4 py-2 rounded-xl border border-gray-200 text-xs w-64" />
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex-1 md:w-64">
+                                    <i data-lucide="search" className="w-4 h-4 absolute left-3.5 top-3 text-gray-400"></i>
+                                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar doador, item ou valor..." className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs focus:border-rose-500" />
+                                </div>
+                                <button onClick={handleExportarPDF} className="bg-rose-600 text-white hover:bg-rose-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs whitespace-nowrap" title="Baixar Relatório Oficial em PDF"><i data-lucide="file-text" className="w-4 h-4"></i> Relatório PDF</button>
+                            </div>
                         </div>
 
-                        {adminSubTab === 'doadores' ? (
-                            <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Nome</th><th className="px-6 py-3.5">Tipo</th><th className="px-6 py-3.5">Documento</th><th className="px-6 py-3.5 text-center">Ações</th></tr></thead><tbody className="divide-y divide-gray-100 text-xs">{doadoresFiltrados.map(d => (<tr key={d.id_doador} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{d.nome}</td><td className="px-6 py-4">{d.tipo_doador}</td><td className="px-6 py-4 font-mono">{formatarDocumento(d.documento || '', d.tipo_doador)}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditDoador(d)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
-                        ) : (
-                            <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Doador</th><th className="px-6 py-3.5">Canal</th><th className="px-6 py-3.5 text-center">Ações</th></tr></thead><tbody className="divide-y divide-gray-100 text-xs">{doacoesFiltradas.map(d => (<tr key={d.id_doacao} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium text-gray-900">{d.doadores ? d.doadores.nome : 'Desconhecido'}</td><td className="px-6 py-4">{d.canal_recebimento}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditDoacao(d)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>))}</tbody></table></div>
+                        {adminSubTab === 'doadores' && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase tracking-wider font-bold border-b border-gray-200">
+                                            <th className="px-6 py-3.5">Nome Completo / Razão Social</th>
+                                            <th className="px-6 py-3.5">Tipo</th>
+                                            <th className="px-6 py-3.5">Documento (CPF/CNPJ)</th>
+                                            <th className="px-6 py-3.5">O que doou (Resumo & Detalhes)</th>
+                                            <th className="px-6 py-3.5">Cidade</th>
+                                            <th className="px-6 py-3.5">Telefone / E-mail</th>
+                                            <th className="px-6 py-3.5 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 text-xs">
+                                        {loadingData ? (
+                                            <tr><td colSpan="7" className="px-6 py-10 text-center text-gray-400"><div className="flex flex-col items-center justify-center gap-3"><div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin"></div><span className="text-xs font-medium text-gray-500">Carregando dados...</span></div></td></tr>
+                                        ) : doadoresFiltrados.length === 0 ? (
+                                            <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Nenhum doador encontrado.</td></tr>
+                                        ) : (
+                                            doadoresFiltrados.map(doador => {
+                                                const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador);
+                                                let totFinDoador = 0; let matItemsDoador = [];
+                                                doacoesDoDoador.forEach(d => {
+                                                    if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => { totFinDoador += parseFloat(f.valor || 0); });
+                                                    if (d.doacoes_materiais) d.doacoes_materiais.forEach(m => { matItemsDoador.push(m); });
+                                                });
+                                                const isExpanded = expandedDoadorId === doador.id_doador;
+                                                return (
+                                                    <React.Fragment key={doador.id_doador}>
+                                                        <tr className={`hover:bg-gray-50 border-b border-gray-200 transition duration-150 ${isExpanded ? 'bg-rose-50/20' : ''}`}>
+                                                            <td className="px-6 py-4 font-medium text-gray-900">{doador.nome}</td>
+                                                            <td className="px-6 py-4 text-xs font-semibold text-gray-500">{doador.tipo_doador === 'PF' ? 'PF' : 'PJ'}</td>
+                                                            <td className="px-6 py-4 font-mono text-xs">{formatarDocumento(doador.documento || '', doador.tipo_doador) || '-'}</td>
+                                                            <td className="px-6 py-4 text-xs">
+                                                                {doacoesDoDoador.length === 0 ? (
+                                                                    <span className="text-gray-400 italic">Sem doações</span>
+                                                                ) : (
+                                                                    <div className="space-y-1 max-w-xs">
+                                                                        <div className="flex flex-wrap items-center gap-1">
+                                                                            {totFinDoador > 0 && <span className="bg-emerald-100 text-emerald-800 text-[11px] px-2 py-0.5 rounded font-bold flex items-center gap-1"><i data-lucide="dollar-sign" className="w-3 h-3"></i> {formatarMoeda(totFinDoador)}</span>}
+                                                                            {matItemsDoador.length > 0 && <span className="bg-blue-100 text-blue-800 text-[11px] px-2 py-0.5 rounded font-medium flex items-center gap-1" title={matItemsDoador.map(m => `${m.descricao_item} (${m.quantidade} ${m.unidade_medida})`).join(', ')}><i data-lucide="package" className="w-3 h-3"></i> {matItemsDoador.reduce((a, m) => a + parseInt(m.quantidade || 0), 0)} itens</span>}
+                                                                        </div>
+                                                                        <button onClick={() => setExpandedDoadorId(isExpanded ? null : doador.id_doador)} className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer pt-0.5"><i data-lucide={isExpanded ? "chevron-up" : "chevron-down"} className="w-3 h-3"></i> {isExpanded ? 'Ocultar doações' : `Ver doações (${doacoesDoDoador.length})`}</button>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-6 py-4 text-xs">{doador.cidade || '-'}</td>
+                                                            <td className="px-6 py-4 text-xs"><div>{formatarTelefone(doador.telefone || '') || '-'}</div>{doador.email && <div className="text-[11px] text-gray-500">{doador.email}</div>}</td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <div className="flex justify-center gap-2">
+                                                                    <button onClick={() => onOpenEditDoador(doador)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Doador"><i data-lucide="pencil" className="w-4 h-4"></i></button>
+                                                                    <button onClick={() => handleDeleteDoador(doador.id_doador, doador.nome)} className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Excluir Doador"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        {isExpanded && (
+                                                            <tr className="bg-rose-50/30 border-b border-rose-100">
+                                                                <td colSpan="7" className="px-6 py-3">
+                                                                    <div className="bg-white p-4 rounded-xl border border-rose-200/80 shadow-xs space-y-3">
+                                                                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                                                            <h4 className="text-xs font-bold text-gray-800 flex items-center gap-1.5"><i data-lucide="gift" className="w-4 h-4 text-rose-600"></i> Histórico de Doações de <span className="text-rose-600 font-extrabold">{doador.nome}</span></h4>
+                                                                            <span className="text-[11px] text-gray-500 font-medium">{doacoesDoDoador.length} evento(s) de doação</span>
+                                                                        </div>
+                                                                        <div className="divide-y divide-gray-100 text-xs">
+                                                                            {doacoesDoDoador.map((doa, idx) => (
+                                                                                <div key={doa.id_doacao || idx} className="py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                                                                    <div className="flex items-center gap-2"><span className="text-gray-400 font-mono text-[11px]">#{idx + 1}</span><span className="bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700">{new Date(doa.data_doacao).toLocaleDateString('pt-BR')}</span><span className="text-gray-500 text-[11px]">Via: <strong>{doa.canal_recebimento}</strong></span></div>
+                                                                                    <div className="flex-1 space-y-1">
+                                                                                        {doa.doacoes_financeiras && doa.doacoes_financeiras.map((f, i) => (<div key={i} className="text-emerald-700 font-bold flex items-center gap-1.5"><span>💰 Valor: {formatarMoeda(f.valor)}</span>{f.comprovante_transacao && <span className="text-gray-500 font-mono text-[11px] font-normal">(Nº {f.comprovante_transacao})</span>}</div>))}
+                                                                                        {doa.doacoes_materiais && doa.doacoes_materiais.map((m, i) => (<div key={i} className="text-slate-800 font-medium"><span>📦 Item: <strong>{m.descricao_item}</strong> ({m.quantidade} {m.unidade_medida})</span><span className="text-gray-500 text-[11px] ml-2">Destino: {m.destino_item} | Estado: {m.estado_conservacao}</span></div>))}
+                                                                                    </div>
+                                                                                    {doa.observacoes && <div className="text-[11px] text-gray-500 italic max-w-xs truncate" title={doa.observacoes}>Obs: {doa.observacoes}</div>}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </React.Fragment>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {adminSubTab === 'doacoes' && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase tracking-wider font-bold border-b border-gray-200">
+                                            <th className="px-6 py-3.5">Doador Vinculado</th>
+                                            <th className="px-6 py-3.5">Canal</th>
+                                            <th className="px-6 py-3.5">Tipo de Doação</th>
+                                            <th className="px-6 py-3.5">Detalhes / Valores Completos</th>
+                                            <th className="px-6 py-3.5">Observações</th>
+                                            <th className="px-6 py-3.5">Data Doação</th>
+                                            <th className="px-6 py-3.5 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 text-xs">
+                                        {loadingData ? (
+                                            <tr><td colSpan="7" className="px-6 py-10 text-center text-gray-400"><div className="flex flex-col items-center justify-center gap-3"><div className="w-8 h-8 border-4 border-rose-600 border-t-transparent rounded-full animate-spin"></div><span className="text-xs font-medium text-gray-500">Carregando dados...</span></div></td></tr>
+                                        ) : doacoesFiltradas.length === 0 ? (
+                                            <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Nenhuma doação encontrada.</td></tr>
+                                        ) : (
+                                            doacoesFiltradas.map(doacao => {
+                                                const nomeDoador = doacao.doadores ? doacao.doadores.nome : 'Doador Desconhecido';
+                                                const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
+                                                const hasFin = doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0;
+                                                const hasMat = doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0;
+
+                                                return (
+                                                    <tr key={doacao.id_doacao} className="hover:bg-gray-50 border-b border-gray-200 transition duration-150">
+                                                        <td className="px-6 py-4 font-medium text-gray-900">{nomeDoador}</td>
+                                                        <td className="px-6 py-4 text-xs">{doacao.canal_recebimento}</td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex flex-wrap items-center gap-1">
+                                                                {hasFin && <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded font-medium">Financeira</span>}
+                                                                {hasMat && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-medium">Material</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs leading-relaxed space-y-1.5">
+                                                            {hasFin && doacao.doacoes_financeiras.map((fin, fIdx) => (
+                                                                <div key={fIdx} className="text-emerald-700 font-bold flex items-center gap-1">
+                                                                    <span>💰 {formatarMoeda(fin.valor)}</span>
+                                                                    {fin.comprovante_transacao && <span className="text-gray-500 font-mono text-[11px] font-normal">(Nº {fin.comprovante_transacao})</span>}
+                                                                </div>
+                                                            ))}
+                                                            {hasMat && doacao.doacoes_materiais.map((mat, mIdx) => (
+                                                                <div key={mIdx} className="bg-slate-50 p-2 rounded-lg border border-slate-100 space-y-0.5">
+                                                                    <div className="font-semibold text-slate-800 flex items-center gap-1">
+                                                                        <span>📦 {mat.descricao_item}</span>
+                                                                        <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.2 rounded font-mono ml-1">{mat.quantidade} {mat.unidade_medida}</span>
+                                                                    </div>
+                                                                    <div className="text-[11px] text-gray-500 flex gap-2">
+                                                                        <span>Destino: <strong>{mat.destino_item}</strong></span>
+                                                                        <span>•</span>
+                                                                        <span>Estado: <strong>{mat.estado_conservacao}</strong></span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </td>
+                                                        <td className="px-6 py-4 max-w-[150px] truncate text-xs" title={doacao.observacoes || ''}>{doacao.observacoes || '-'}</td>
+                                                        <td className="px-6 py-4 text-xs whitespace-nowrap">{dataFmt}</td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <div className="flex justify-center gap-2">
+                                                                <button onClick={() => onOpenEditDoacao(doacao)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Editar Doação"><i data-lucide="pencil" className="w-4 h-4"></i></button>
+                                                                <button onClick={() => handleDeleteDoacao(doacao.id_doacao)} className="bg-rose-50 text-rose-600 hover:bg-rose-100 p-2 rounded-lg cursor-pointer transition flex items-center justify-center w-8 h-8" title="Excluir Doação"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </div>
                 </div>
