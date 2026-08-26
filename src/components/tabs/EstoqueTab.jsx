@@ -518,8 +518,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
                                             );
                                         })
                                     )
-                                )
-                            )}
+                                )}
                             </tbody>
                         </table>
                     </div>
