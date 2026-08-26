@@ -2,19 +2,13 @@
 -- APRESENTACAO -- Banco de Dados 3º Bimestre
 -- Sistema: Controle de Estoque e Doações (ONG Social)
 -- ================================================================
--- Estrutura:
---    Setup      -- DDL, Procedure, Constraints, DCL
---    Insercao   -- DML com dados reais de estoque e doações
---    Secao 2    -- Funções de Agregação (COUNT, SUM, MAX, MIN, AVG)
---    Secao 3    -- GROUP BY e HAVING
---    Secao 4    -- Operadores de Conjunto (UNION, UNION ALL)
---    Secao 5    -- DISTINCT, IN, EXISTS e NOT EXISTS
---    Secao 6    -- Índices e SHOW INDEX
---    Secao 7    -- Análise de Consulta com EXPLAIN
---    Secao 8    -- Views (Visões)
---    Secao 9    -- Functions (Funções SQL)
---    Secao 10   -- Relatório Avançado do Sistema
---    Secao 11   -- Conclusão (dificuldades, aprendizados, melhorias)
+-- ROTEIRO DE EXPLICAÇÃO GERAL PARA A APRESENTAÇÃO:
+-- 1. Setup e DCL: Demonstra a criação limpa do banco e o princípio do menor privilégio.
+-- 2. Inserção (DML): Popula o banco com dados reais de doações e estoque físico.
+-- 3. Consultas Avançadas (Agregação, Group By, Union, Distinct/Exists): 
+--    Focam em extrair métricas gerenciais e otimizar relatórios.
+-- 4. Otimização e Segurança (Índices, Explain, Views, Functions): 
+--    Garantem performance de busca e encapsulamento de regras de negócio.
 -- ================================================================
 
 -- ================================================================
@@ -26,13 +20,16 @@ DROP DATABASE IF EXISTS ong_estoque_db;
 DROP USER IF EXISTS 'admin_ong'@'localhost';
 DROP USER IF EXISTS 'estoquista_ong'@'localhost';
 
+-- Criação do banco com suporte a caracteres especiais (UTF-8)
 CREATE DATABASE ong_estoque_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE ong_estoque_db;
 
 -- ----------------------------------------------------------------
--- Tabelas (Modelagem com UUIDs para o MySQL 8.0)
+-- Tabelas (Modelagem Relacional com UUIDs e Chaves Estrangeiras)
 -- ----------------------------------------------------------------
 
+-- Tabela de Doadores: Armazena informações dos colaboradores da ONG.
+-- Explicação: Utiliza CHAR(36) com UUID para identificação global única e segura.
 CREATE TABLE doadores (
     id_doador      CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
     nome           VARCHAR(150)   NOT NULL,
@@ -41,11 +38,14 @@ CREATE TABLE doadores (
     created_at     TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabela de Categorias: Organiza os itens do estoque por setores.
 CREATE TABLE categorias (
     id_categoria   INT AUTO_INCREMENT PRIMARY KEY,
     nome_categoria VARCHAR(50)   NOT NULL UNIQUE
 );
 
+-- Tabela de Estoque: Controla o volume físico dos mantimentos e insumos.
+-- Explicação: Possui chave estrangeira vinculada à categoria com restrição de exclusão (RESTRICT).
 CREATE TABLE estoque (
     id_item        CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
     id_categoria   INT            NOT NULL,
@@ -56,6 +56,8 @@ CREATE TABLE estoque (
         REFERENCES categorias(id_categoria) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
+-- Tabela de Doações: Registra as entradas vinculadas aos doadores.
+-- Explicação: Utiliza ON DELETE SET NULL para garantir que, se um doador for removido, o histórico da doação não seja perdido.
 CREATE TABLE doacoes (
     id_doacao      CHAR(36)       PRIMARY KEY DEFAULT (UUID()),
     id_doador      CHAR(36),
@@ -68,14 +70,15 @@ CREATE TABLE doacoes (
 -- ----------------------------------------------------------------
 -- DCL -- Gerenciamento de Privilégios e Perfis de Acesso
 -- ----------------------------------------------------------------
+-- Explicação: Aplicamos o princípio do menor privilégio, separando perfis administrativos de operadores de estoque.
 
 CREATE USER IF NOT EXISTS 'admin_ong'@'localhost'       IDENTIFIED BY 'admin_senha_forte';
 CREATE USER IF NOT EXISTS 'estoquista_ong'@'localhost'  IDENTIFIED BY 'estoque_123';
 
--- Administrador possui controle total irrestrito
+-- Administrador possui controle total irrestrito sobre todo o banco de dados
 GRANT ALL PRIVILEGES ON ong_estoque_db.* TO 'admin_ong'@'localhost' WITH GRANT OPTION;
 
--- Perfil Estoquista gerencia apenas itens e categorias
+-- Perfil Estoquista possui permissão estrita apenas para gerenciar itens e visualizar categorias
 GRANT SELECT, INSERT, UPDATE ON ong_estoque_db.estoque     TO 'estoquista_ong'@'localhost';
 GRANT SELECT                 ON ong_estoque_db.categorias  TO 'estoquista_ong'@'localhost';
 
@@ -86,17 +89,20 @@ FLUSH PRIVILEGES;
 -- INSERÇÃO DE DADOS (DML)
 -- ================================================================
 
+-- Carga inicial de categorias para padronizar os produtos
 INSERT INTO categorias (nome_categoria) VALUES 
 ('Alimentos'),
 ('Vestuário'),
 ('Higiene'),
 ('Limpeza');
 
+-- Carga de doadores com dados fictícios reais
 INSERT INTO doadores (id_doador, nome, email, telefone) VALUES 
     ('d2000000-0000-0000-0000-000000000001', 'Ana Paula Ribeiro', 'ana@email.com', '(44) 99111-2222'),
     ('d2000000-0000-0000-0000-000000000002', 'Marcos Vinicius', 'marcos@email.com', '(44) 99222-3333'),
     ('d2000000-0000-0000-0000-000000000003', 'Carla Dias', 'carla@email.com', '(43) 99333-4444');
 
+-- Carga de produtos no estoque associados às suas respectivas categorias
 INSERT INTO estoque (id_item, id_categoria, nome_item, quantidade, valor_unitario) VALUES 
     (UUID(), 1, 'Cesta Básica 10kg', 15, 85.50),
     (UUID(), 1, 'Pacote de Arroz 5kg', 30, 24.00),
@@ -105,6 +111,7 @@ INSERT INTO estoque (id_item, id_categoria, nome_item, quantidade, valor_unitari
     (UUID(), 3, 'Kit Higiene Pessoal', 18, 35.00),
     (UUID(), 4, 'Desinfetante 2L', 2, 10.00);
 
+-- Registro de doações vinculadas aos doadores cadastrados
 INSERT INTO doacoes (id_doacao, id_doador, data_doacao, observacoes) VALUES 
     (UUID(), 'd2000000-0000-0000-0000-000000000001', '2026-06-01 10:00:00', 'Doação mensal de alimentos'),
     (UUID(), 'd2000000-0000-0000-0000-000000000002', '2026-06-10 14:30:00', 'Campanha do agasalho');
@@ -113,6 +120,10 @@ INSERT INTO doacoes (id_doacao, id_doador, data_doacao, observacoes) VALUES
 -- ================================================================
 -- SEÇÃO 2 -- FUNÇÕES DE AGREGAÇÃO (COUNT, SUM, MAX, MIN, AVG)
 -- ================================================================
+-- O que falar na apresentação: "Utilizamos as funções de agregação para resumir 
+-- o volume do estoque: COUNT conta a variedade de itens, SUM soma o total de peças físicas, 
+-- MAX/MIN identificam os lotes extremos, e AVG tira a média de unidades por lote."
+
 SELECT 
     COUNT(*) AS total_itens_estoque,
     SUM(quantidade) AS quantidade_total_pecas,
@@ -125,6 +136,10 @@ FROM estoque;
 -- ================================================================
 -- SEÇÃO 3 -- GROUP BY e HAVING
 -- ================================================================
+-- O que falar na apresentação: "O GROUP BY agrupa os dados por categoria de produto, 
+-- e o HAVING atua como um filtro pós-agregação, exibindo apenas as categorias 
+-- que possuem um volume total acumulado superior a 5 unidades."
+
 SELECT 
     c.nome_categoria, 
     COUNT(e.id_item) AS total_produtos,
@@ -138,6 +153,10 @@ HAVING SUM(e.quantidade) > 5;
 -- ================================================================
 -- SEÇÃO 4 -- OPERADORES DE CONJUNTO (UNION / UNION ALL)
 -- ================================================================
+-- O que falar na apresentação: "O operador UNION une os resultados de duas consultas 
+-- estruturalmente iguais (Alimentos e Vestuário) em uma única listagem limpa, 
+-- eliminando duplicatas automaticamente."
+
 SELECT nome_item, quantidade, 'Alimentos' AS setor FROM estoque WHERE id_categoria = 1
 UNION
 SELECT nome_item, quantidade, 'Vestuário' AS setor FROM estoque WHERE id_categoria = 2;
@@ -147,22 +166,22 @@ SELECT nome_item, quantidade, 'Vestuário' AS setor FROM estoque WHERE id_catego
 -- SEÇÃO 5 -- DISTINCT, IN, EXISTS e NOT EXISTS
 -- ================================================================
 
--- a) DISTINCT: Categorias únicas presentes no estoque
+-- a) DISTINCT: Remove repetições para listar apenas as categorias ativas no estoque
 SELECT DISTINCT c.nome_categoria 
 FROM categorias c 
 JOIN estoque e ON c.id_categoria = e.id_categoria;
 
--- b) IN: Filtrar itens de categorias específicas
+-- b) IN: Filtra itens pertencentes especificamente às categorias 1 (Alimentos) ou 3 (Higiene)
 SELECT * FROM estoque 
 WHERE id_categoria IN (1, 3);
 
--- c) EXISTS: Doadores que possuem doações registradas
+-- c) EXISTS: Verifica de forma otimizada quais doadores possuem doações ativas registradas
 SELECT * FROM doadores d
 WHERE EXISTS (
     SELECT 1 FROM doacoes doacao WHERE doacao.id_doador = d.id_doador
 );
 
--- d) NOT EXISTS: Doadores cadastrados que nunca realizaram doações
+-- d) NOT EXISTS: Identifica doadores cadastrados que nunca realizaram nenhuma doação (inativos)
 SELECT * FROM doadores d
 WHERE NOT EXISTS (
     SELECT 1 FROM doacoes doacao WHERE doacao.id_doador = d.id_doador
@@ -172,6 +191,9 @@ WHERE NOT EXISTS (
 -- ================================================================
 -- SEÇÃO 6 -- ÍNDICES E SHOW INDEX
 -- ================================================================
+-- O que falar na apresentação: "Criamos um índice na coluna nome_item para evitar 
+-- a varredura sequencial (Full Table Scan) e acelerar as buscas na tabela de estoque."
+
 CREATE INDEX idx_estoque_nome ON estoque(nome_item);
 
 SHOW INDEX FROM estoque;
@@ -180,6 +202,9 @@ SHOW INDEX FROM estoque;
 -- ================================================================
 -- SEÇÃO 7 -- ANÁLISE DE CONSULTA COM EXPLAIN
 -- ================================================================
+-- O que falar na apresentação: "O EXPLAIN nos permite comprovar que o SGBD utilizou 
+-- o índice criado para localizar o item de forma otimizada."
+
 EXPLAIN SELECT * FROM estoque WHERE nome_item = 'Cesta Básica 10kg';
 
 
@@ -188,6 +213,7 @@ EXPLAIN SELECT * FROM estoque WHERE nome_item = 'Cesta Básica 10kg';
 -- ================================================================
 
 -- View 1: Resumo consolidado do estoque por categoria
+-- Explicação: Encapsula a lógica de contagem e soma em uma tabela virtual reutilizável.
 CREATE OR REPLACE VIEW vw_resumo_estoque AS
 SELECT 
     c.nome_categoria, 
@@ -197,16 +223,17 @@ FROM categorias c
 LEFT JOIN estoque e ON c.id_categoria = e.id_categoria
 GROUP BY c.nome_categoria;
 
--- Teste da View 1
+-- Acesso à View 1
 SELECT * FROM vw_resumo_estoque;
 
 -- View 2: Relatório de Doadores Ativos
+-- Explicação: Oculta a complexidade do JOIN entre doadores e doações.
 CREATE OR REPLACE VIEW vw_doadores_ativos AS
 SELECT DISTINCT d.id_doador, d.nome, d.email
 FROM doadores d
 JOIN doacoes doacao ON doacao.id_doador = d.id_doador;
 
--- Teste da View 2
+-- Acesso à View 2
 SELECT * FROM vw_doadores_ativos;
 
 
@@ -216,7 +243,7 @@ SELECT * FROM vw_doadores_ativos;
 
 DELIMITER $$
 
--- Função 1: Calcular valor total de um lote com base na quantidade e preço unitário
+-- Função 1: Calcula o valor financeiro total de um lote (quantidade x preço unitário)
 CREATE FUNCTION fn_calcular_total_lote(p_qtd INT, p_valor_unit DECIMAL(10,2)) 
 RETURNS DECIMAL(10,2)
 DETERMINISTIC
@@ -224,7 +251,7 @@ BEGIN
     RETURN p_qtd * p_valor_unit;
 END$$
 
--- Função 2: Classificar nível de criticidade do estoque
+-- Função 2: Classifica o nível de criticidade do estoque com base em regras lógicas condicionais (IF/ELSE)
 CREATE FUNCTION fn_classificar_estoque(p_qtd INT) 
 RETURNS VARCHAR(30)
 DETERMINISTIC
@@ -253,6 +280,10 @@ FROM estoque;
 -- ================================================================
 -- SEÇÃO 10 -- RELATÓRIO AVANÇADO DO SISTEMA
 -- ================================================================
+-- O que falar na apresentação: "Este relatório combina JOIN, funções de agregação, 
+-- GROUP BY, HAVING e ORDER BY para entregar uma visão analítica gerencial completa 
+-- das categorias de maior volume físico estocado."
+
 SELECT 
     c.nome_categoria,
     COUNT(e.id_item) AS total_tipos_itens,
@@ -283,7 +314,7 @@ ORDER BY soma_total_unidades DESC;
 --
 -- 3. Concepção Lógica de Funções Determinísticas:
 --    Definir corretamente os parâmetros de entrada e retornos escalares 
---    dentro da sintaxe em PL/pgSQL / MySQL Procedures.
+--    dentro da sintaxe procedural do SGBD.
 
 -- ----------------------------------------------------------------
 -- Conhecimentos adquiridos
