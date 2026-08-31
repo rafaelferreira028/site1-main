@@ -133,7 +133,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                     comprovante_transacao: finComprovante || null
                 };
                 const { error: errorFin } = await window.doacoesService.criarDoacaoFinanceira(dadosFin);
-                if (errorFin) mostrarToast('Erro ao salvar dados financeiros: ' + errorFin.message, 'error');
+                if (errorFin) throw errorFin;
             }
 
             if (checkMaterial) {
@@ -147,7 +147,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                     destino_item: matDestino
                 };
                 const { error: errorMat } = await window.doacoesService.criarDoacaoMaterial(dadosMat);
-                if (errorMat) mostrarToast('Erro ao salvar materiais: ' + errorMat.message, 'error');
+                if (errorMat) throw errorMat;
             }
 
             mostrarToast('Doação registrada com sucesso no Supabase!', 'success');
@@ -284,6 +284,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                                 <input
                                     type="number"
                                     id="fin-valor"
+                                    min="0.01"
                                     step="0.01"
                                     value={finValor}
                                     onChange={(e) => setFinValor(e.target.value)}

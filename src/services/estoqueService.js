@@ -38,7 +38,9 @@ async function buscarEstoqueDoacoesCanais() {
 
 async function atualizarItemEstoqueLote(idMaterial, dadosItem) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
-    return await window.supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
+    const resultado = await window.supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
+    if (resultado.error) throw resultado.error;
+    return resultado;
 }
 
 async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
@@ -58,8 +60,8 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
     });
 
     const results = await Promise.all(updatePromises);
-    const hasError = results.some(r => r.error);
-    if (hasError) throw new Error("Erro ao atualizar alguns lotes do estoque.");
+    const failure = results.find(r => r.error);
+    if (failure) throw failure.error;
     return true;
 }
 

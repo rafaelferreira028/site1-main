@@ -18,7 +18,9 @@ async function criarDoador(dadosDoador) {
 
 async function atualizarDoador(idDoador, dadosDoador) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
-    return await window.supabaseClient.from('doadores').update(dadosDoador).eq('id_doador', idDoador);
+    const resultado = await window.supabaseClient.from('doadores').update(dadosDoador).eq('id_doador', idDoador);
+    if (resultado.error) throw resultado.error;
+    return resultado;
 }
 
 async function deletarDoadorCascata(idDoador) {
@@ -45,7 +47,9 @@ async function deletarDoadorCascata(idDoador) {
     }
 
     // 5. Excluir o doador
-    return await window.supabaseClient.from('doadores').delete().eq('id_doador', idDoador);
+    const resultado = await window.supabaseClient.from('doadores').delete().eq('id_doador', idDoador);
+    if (resultado.error) throw resultado.error;
+    return resultado;
 }
 
 window.doadoresService = {

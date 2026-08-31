@@ -215,18 +215,18 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
             {/* Tabela Interativa de Registros */}
             <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-                    <div className="flex items-center gap-2 bg-gray-100/90 p-1.5 rounded-2xl">
+                    <div className="flex items-center gap-2 bg-slate-200 p-1.5 rounded-2xl">
                         <button
                             id="btn-sub-doadores"
                             onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); }}
-                            className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doadores' ? 'bg-white shadow-md text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}
+                            className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doadores' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
                         >
                             <i data-lucide="users" className="w-4 h-4"></i> Tabela de Doadores
                         </button>
                         <button
                             id="btn-sub-doacoes"
                             onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); }}
-                            className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doacoes' ? 'bg-white shadow-md text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}
+                            className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doacoes' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
                         >
                             <i data-lucide="heart-handshake" className="w-4 h-4"></i> Histórico de Doações
                         </button>

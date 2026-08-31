@@ -3,7 +3,7 @@ const { createContext, useContext, useState, useEffect } = React;
 const AuthContext = createContext();
 
 function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
-    const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem('app_autenticado') === 'true');
+    const [authenticated, setAuthenticated] = useState(false);
     const [session, setSession] = useState(null);
 
     const checkAuth = async () => {
@@ -11,12 +11,7 @@ function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
         try {
             const { session: sess } = await window.authService.verificarSessaoSupabase();
             setSession(sess);
-            if (sess || sessionStorage.getItem('app_autenticado') === 'true') {
-                sessionStorage.setItem('app_autenticado', 'true');
-                setAuthenticated(true);
-            } else {
-                setAuthenticated(false);
-            }
+            setAuthenticated(Boolean(sess));
         } catch (e) {
             console.error("Erro na checagem de autenticação:", e);
         } finally {
@@ -33,7 +28,6 @@ function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
         try {
             const { data, error } = await window.authService.realizarLoginSupabase(email, password);
             if (error) throw error;
-            sessionStorage.setItem('app_autenticado', 'true');
             setAuthenticated(true);
             setSession(data ? data.session : null);
             return { success: true };
@@ -51,7 +45,6 @@ function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
         } catch (e) {
             console.error(e);
         } finally {
-            sessionStorage.removeItem('app_autenticado');
             setAuthenticated(false);
             setSession(null);
             if (onLoadingEnd) onLoadingEnd();

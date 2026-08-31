@@ -237,6 +237,7 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label>
                                     <input
                                         type="number"
+                                        min="0.01"
                                         step="0.01"
                                         value={finValor}
                                         onChange={(e) => setFinValor(e.target.value)}

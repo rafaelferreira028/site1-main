@@ -127,7 +127,7 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
                             value={telefone}
                             onChange={(e) => setTelefone(window.formatarTelefone(e.target.value))}
                             maxLength={15}
-                            placeholder="(00) 00000-0000"
+                            placeholder="Ex: (44) 99999-9999"
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500 font-mono"
                         />
                     </div>
@@ -138,7 +138,7 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
                             id="doador-email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="doador@email.com"
+                            placeholder="Ex: maria.silva@email.com"
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                         />
                     </div>
@@ -152,7 +152,7 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
                             id="doador-cidade"
                             value={cidade}
                             onChange={(e) => setCidade(e.target.value)}
-                            placeholder="Ex: Catanduva - SP"
+                            placeholder="Ex: Astorga - PR"
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                         />
                     </div>

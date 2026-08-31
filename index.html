@@ -128,7 +128,9 @@
             },
             atualizarDoador: async (idDoador, dadosDoador) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
-                return await supabaseClient.from('doadores').update(dadosDoador).eq('id_doador', idDoador);
+                const resultado = await supabaseClient.from('doadores').update(dadosDoador).eq('id_doador', idDoador);
+                if (resultado.error) throw resultado.error;
+                return resultado;
             },
             deletarDoadorCascata: async (idDoador) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
@@ -136,11 +138,16 @@
                 if (errList) throw errList;
                 if (listDoacoes && listDoacoes.length > 0) {
                     const idsDoacoes = listDoacoes.map(d => d.id_doacao);
-                    await supabaseClient.from('doacoes_financeiras').delete().in('id_doacao', idsDoacoes);
-                    await supabaseClient.from('doacoes_materiais').delete().in('id_doacao', idsDoacoes);
-                    await supabaseClient.from('doacoes').delete().in('id_doacao', idsDoacoes);
+                    const { error: errFin } = await supabaseClient.from('doacoes_financeiras').delete().in('id_doacao', idsDoacoes);
+                    if (errFin) throw errFin;
+                    const { error: errMat } = await supabaseClient.from('doacoes_materiais').delete().in('id_doacao', idsDoacoes);
+                    if (errMat) throw errMat;
+                    const { error: errDoacoes } = await supabaseClient.from('doacoes').delete().in('id_doacao', idsDoacoes);
+                    if (errDoacoes) throw errDoacoes;
                 }
-                return await supabaseClient.from('doadores').delete().eq('id_doador', idDoador);
+                const resultado = await supabaseClient.from('doadores').delete().eq('id_doador', idDoador);
+                if (resultado.error) throw resultado.error;
+                return resultado;
             }
         };
 
@@ -179,32 +186,43 @@
             },
             deletarDoacaoCompleta: async (idDoacao) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
-                await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
-                await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
-                return await supabaseClient.from('doacoes').delete().eq('id_doacao', idDoacao);
+                const { error: errFin } = await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+                if (errFin) throw errFin;
+                const { error: errMat } = await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+                if (errMat) throw errMat;
+                const resultado = await supabaseClient.from('doacoes').delete().eq('id_doacao', idDoacao);
+                if (resultado.error) throw resultado.error;
+                return resultado;
             },
             atualizarDoacaoCompleta: async (idDoacao, dadosPai, dadosFin, dadosMat, editHasFin, editHasMat, originalDoacao) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
-                await supabaseClient.from('doacoes').update(dadosPai).eq('id_doacao', idDoacao);
+                const { error: errorPai } = await supabaseClient.from('doacoes').update(dadosPai).eq('id_doacao', idDoacao);
+                if (errorPai) throw errorPai;
                 if (editHasFin) {
                     const originallyHadFin = originalDoacao && originalDoacao.doacoes_financeiras && originalDoacao.doacoes_financeiras.length > 0;
                     if (originallyHadFin) {
-                        await supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
+                        const { error } = await supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
+                        if (error) throw error;
                     } else {
-                        await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                        const { error } = await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                        if (error) throw error;
                     }
                 } else {
-                    await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+                    const { error } = await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+                    if (error) throw error;
                 }
                 if (editHasMat) {
                     const originallyHadMat = originalDoacao && originalDoacao.doacoes_materiais && originalDoacao.doacoes_materiais.length > 0;
                     if (originallyHadMat) {
-                        await supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
+                        const { error } = await supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
+                        if (error) throw error;
                     } else {
-                        await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                        const { error } = await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                        if (error) throw error;
                     }
                 } else {
-                    await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+                    const { error } = await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+                    if (error) throw error;
                 }
                 return true;
             }
@@ -245,7 +263,9 @@
             },
             atualizarItemEstoqueLote: async (idMaterial, dadosItem) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
-                return await supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
+                const resultado = await supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
+                if (resultado.error) throw resultado.error;
+                return resultado;
             },
             atualizarEstoqueConsolidado: async (lotes, diferenca, novosDados) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
@@ -254,7 +274,9 @@
                     if (index === 0) qtdLote = Math.max(0, lote.quantidade + diferenca);
                     return supabaseClient.from('doacoes_materiais').update({ ...novosDados, quantidade: qtdLote }).eq('id_material', lote.id_material);
                 });
-                await Promise.all(updatePromises);
+                const resultados = await Promise.all(updatePromises);
+                const falha = resultados.find(resultado => resultado.error);
+                if (falha) throw falha.error;
                 return true;
             }
         };
@@ -429,7 +451,7 @@
 
         const AuthContext = createContext();
         function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
-            const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem('app_autenticado') === 'true');
+            const [authenticated, setAuthenticated] = useState(false);
             const [session, setSession] = useState(null);
 
             const checkAuth = async () => {
@@ -437,12 +459,7 @@
                 try {
                     const { session: sess } = await authService.verificarSessaoSupabase();
                     setSession(sess);
-                    if (sess || sessionStorage.getItem('app_autenticado') === 'true') {
-                        sessionStorage.setItem('app_autenticado', 'true');
-                        setAuthenticated(true);
-                    } else {
-                        setAuthenticated(false);
-                    }
+                    setAuthenticated(Boolean(sess));
                 } catch (e) {
                     console.error("Erro na checagem de autenticação:", e);
                 } finally {
@@ -457,7 +474,6 @@
                 try {
                     const { data, error } = await authService.realizarLoginSupabase(email, password);
                     if (error) throw error;
-                    sessionStorage.setItem('app_autenticado', 'true');
                     setAuthenticated(true);
                     setSession(data ? data.session : null);
                     return { success: true };
@@ -475,7 +491,6 @@
                 } catch (e) {
                     console.error(e);
                 } finally {
-                    sessionStorage.removeItem('app_autenticado');
                     setAuthenticated(false);
                     setSession(null);
                     if (onLoadingEnd) onLoadingEnd();
@@ -1003,11 +1018,11 @@
                             <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">{tipoDoador === 'PF' ? 'CPF *' : 'CNPJ *'}</label><input type="text" value={documento} onChange={(e) => setDocumento(formatarDocumento(e.target.value, tipoDoador))} maxLength={tipoDoador === 'PF' ? 14 : 18} placeholder={tipoDoador === 'PF' ? "000.000.000-00" : "00.000.000/0000-00"} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Telefone / WhatsApp</label><input type="tel" value={telefone} onChange={(e) => setTelefone(formatarTelefone(e.target.value))} maxLength={15} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Telefone / WhatsApp</label><input type="tel" value={telefone} onChange={(e) => setTelefone(formatarTelefone(e.target.value))} maxLength={15} placeholder="Ex: (44) 99999-9999" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Ex: maria.silva@email.com" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Cidade / UF</label><input type="text" value={cidade} onChange={(e) => setCidade(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Cidade / UF</label><input type="text" value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex: Astorga - PR" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
                             <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Data Nasc./Fund.</label><input type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                         </div>
                         <div className="pt-4 flex justify-end"><button type="submit" className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2"><i data-lucide="save" className="w-5 h-5"></i> Salvar Doador</button></div>
@@ -1077,9 +1092,16 @@
                 try {
                     const { data: doacaoCriada, error: errorPai } = await doacoesService.criarEventoDoacao({ id_doador: parseInt(idDoador), canal_recebimento: canal, observacoes: observacoes || null });
                     if (errorPai) throw errorPai;
+                    if (!doacaoCriada || doacaoCriada.length === 0) throw new Error('Não foi possível obter o identificador da doação criada.');
                     const idDoacaoGerado = doacaoCriada[0].id_doacao;
-                    if (checkFinanceiro) await doacoesService.criarDoacaoFinanceira({ id_doacao: idDoacaoGerado, valor: parseFloat(finValor), comprovante_transacao: finComprovante || null });
-                    if (checkMaterial) await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: parseInt(matCategoria), descricao_item: matDescricao, quantidade: parseInt(matQtd), unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
+                    if (checkFinanceiro) {
+                        const { error } = await doacoesService.criarDoacaoFinanceira({ id_doacao: idDoacaoGerado, valor: parseFloat(finValor), comprovante_transacao: finComprovante || null });
+                        if (error) throw error;
+                    }
+                    if (checkMaterial) {
+                        const { error } = await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: parseInt(matCategoria), descricao_item: matDescricao, quantidade: parseInt(matQtd), unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
+                        if (error) throw error;
+                    }
 
                     mostrarToast('Doação registrada com sucesso!', 'success');
                     setIdDoador(''); setDoadorSearchQuery(''); setCheckFinanceiro(false); setFinValor(''); setCheckMaterial(false); setMatDescricao(''); setDropdownOpen(false);
@@ -1134,7 +1156,7 @@
 
                         {checkFinanceiro && (
                             <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label><input type="number" step="0.01" value={finValor} onChange={(e) => setFinValor(e.target.value)} required placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label><input type="number" min="0.01" step="0.01" value={finValor} onChange={(e) => setFinValor(e.target.value)} required placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nº Comprovante / Transação</label><input type="text" value={finComprovante} onChange={(e) => setFinComprovante(e.target.value)} placeholder="Ex: TX-984201" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                             </div>
                         )}
@@ -1308,9 +1330,9 @@
 
                     <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-                            <div className="flex items-center gap-2 bg-gray-100/90 p-1.5 rounded-2xl">
-                                <button onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doadores' ? 'bg-white shadow-md text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="users" className="w-4 h-4"></i> Tabela de Doadores</button>
-                                <button onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doacoes' ? 'bg-white shadow-md text-rose-600' : 'text-gray-500 hover:text-gray-800'}`}><i data-lucide="heart-handshake" className="w-4 h-4"></i> Histórico de Doações</button>
+                            <div className="flex items-center gap-2 bg-slate-200 p-1.5 rounded-2xl">
+                                <button onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doadores' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}><i data-lucide="users" className="w-4 h-4"></i> Tabela de Doadores</button>
+                                <button onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doacoes' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}><i data-lucide="heart-handshake" className="w-4 h-4"></i> Histórico de Doações</button>
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative flex-1 md:w-64">

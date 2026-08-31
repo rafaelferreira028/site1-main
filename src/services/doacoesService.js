@@ -46,7 +46,9 @@ async function deletarDoacaoCompleta(idDoacao) {
     const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
     if (errMat) throw errMat;
 
-    return await window.supabaseClient.from('doacoes').delete().eq('id_doacao', idDoacao);
+    const resultado = await window.supabaseClient.from('doacoes').delete().eq('id_doacao', idDoacao);
+    if (resultado.error) throw resultado.error;
+    return resultado;
 }
 
 async function atualizarDoacaoCompleta(idDoacao, dadosPai, dadosFin, dadosMat, editHasFin, editHasMat, originalDoacao) {
@@ -65,7 +67,8 @@ async function atualizarDoacaoCompleta(idDoacao, dadosPai, dadosFin, dadosMat, e
             if (errFin) throw errFin;
         }
     } else {
-        await window.supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+        const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
+        if (errFin) throw errFin;
     }
 
     if (editHasMat) {
@@ -78,7 +81,8 @@ async function atualizarDoacaoCompleta(idDoacao, dadosPai, dadosFin, dadosMat, e
             if (errMat) throw errMat;
         }
     } else {
-        await window.supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+        const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
+        if (errMat) throw errMat;
     }
 
     return true;
