@@ -1572,7 +1572,7 @@
             const q = searchQuery.toLowerCase().trim();
 
             let materiaisFiltrados = [];
-            if (estoqueSubTab === 'Geral') materiaisFiltrados = estoqueList.filter(m => m.destino_item !== 'Bazar' && m.id_categoria !== 6);
+            if (estoqueSubTab === 'Geral') materiaisFiltrados = estoqueList;
             else if (estoqueSubTab === 'Bazar') materiaisFiltrados = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6);
             else {
                 const mapCat = { 'Alimentos': 2, 'Higiene': 3, 'Cabelo': 4, 'Ortopedicos': 5 };
@@ -1584,9 +1584,10 @@
             const gruposConsolidados = {};
             if (modoVisao === 'consolidado') {
                 materiaisFiltrados.forEach(item => {
-                    const key = estoqueSubTab === 'Geral' ? 'estoque-geral' : estoqueSubTab.toLowerCase();
+                    const categoria = item.categorias_itens?.nome_categoria || 'Sem categoria';
+                    const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
                     if (!gruposConsolidados[key]) {
-                        gruposConsolidados[key] = { key, descricao: estoqueSubTab === 'Geral' ? 'Total do Estoque Geral' : `Total do ${estoqueSubTab}`, quantidadeTotal: 0, unidade: 'Itens', destino: estoqueSubTab === 'Geral' ? 'Estoque Geral' : item.destino_item, lotes: [] };
+                        gruposConsolidados[key] = { key, descricao: categoria, quantidadeTotal: 0, unidade: 'Itens', destino: item.destino_item === 'Bazar' || item.id_categoria === 6 ? 'Bazar' : 'Estoque Geral', lotes: [] };
                     }
                     gruposConsolidados[key].quantidadeTotal += parseInt(item.quantidade || 0);
                     gruposConsolidados[key].lotes.push(item);

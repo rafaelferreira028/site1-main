@@ -102,7 +102,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
 
     let materiaisFiltrados = [];
     if (estoqueSubTab === 'Geral') {
-        materiaisFiltrados = estoqueList.filter(m => m.destino_item !== 'Bazar' && m.id_categoria !== 6);
+        materiaisFiltrados = estoqueList;
     } else if (estoqueSubTab === 'Bazar') {
         materiaisFiltrados = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6 || (m.categorias_itens && m.categorias_itens.nome_categoria.toLowerCase().includes('bazar')));
     } else {
@@ -124,14 +124,15 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
     const gruposConsolidados = {};
     if (modoVisao === 'consolidado') {
         materiaisFiltrados.forEach(item => {
-            const key = estoqueSubTab === 'Geral' ? 'estoque-geral' : estoqueSubTab.toLowerCase();
+            const categoria = item.categorias_itens?.nome_categoria || 'Sem categoria';
+            const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
             if (!gruposConsolidados[key]) {
                 gruposConsolidados[key] = {
                     key,
-                    descricao: estoqueSubTab === 'Geral' ? 'Total do Estoque Geral' : `Total do ${estoqueSubTab}`,
+                    descricao: categoria,
                     quantidadeTotal: 0,
                     unidade: 'Itens',
-                    destino: estoqueSubTab === 'Geral' ? 'Estoque Geral' : item.destino_item,
+                    destino: item.destino_item === 'Bazar' || item.id_categoria === 6 ? 'Bazar' : 'Estoque Geral',
                     estado: 'Não se aplica',
                     id_categoria: null,
                     lotes: []
