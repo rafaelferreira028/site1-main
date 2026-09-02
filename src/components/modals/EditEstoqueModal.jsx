@@ -144,13 +144,12 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                         </div>
                     </div>
 
-                    <div>
+                    <div className={modo === 'consolidado' ? 'hidden' : ''}>
                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino Atual *</label>
                         <select
                             id="edit-stock-destino"
                             value={destino}
                             onChange={(e) => setDestino(e.target.value)}
-                            disabled={modo === 'consolidado'}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                         >
                             <option value="Estoque Geral">Estoque Geral (Uso Institucional)</option>

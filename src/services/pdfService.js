@@ -44,7 +44,7 @@ async function exportarPDFEstoqueOficial() {
 
     // 2. Resumo de Métricas (Cards no PDF)
     const totalItens = materiais.reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-    const totalBazar = materiais.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+    const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
     const totalAlimentos = materiais.filter(m => m.id_categoria === 2).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
     const totalHigiene = materiais.filter(m => m.id_categoria === 3).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
 
@@ -60,19 +60,19 @@ async function exportarPDFEstoqueOficial() {
     doc.text(`ALIMENTOS: ${totalAlimentos} un.`, 150, 36.5);
     doc.text(`HIGIENE: ${totalHigiene} un.`, 220, 36.5);
 
-    // 3. Tabela Consolidada de Itens
+    // 3. Tabela Consolidada por categoria (igual à visão Consolidado do estoque)
     const grupos = {};
     materiais.forEach(item => {
-        const catNome = item.categorias_itens ? item.categorias_itens.nome_categoria : 'Geral';
-        const key = `${item.descricao_item.trim().toLowerCase()}_${catNome.toLowerCase()}_${item.destino_item.toLowerCase()}_${item.unidade_medida.toLowerCase()}`;
+        const categoria = item.destino_item === 'Bazar' || item.id_categoria === 6
+            ? 'Bazar'
+            : (item.categorias_itens?.nome_categoria || 'Sem categoria');
+        const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
         if (!grupos[key]) {
             grupos[key] = {
-                descricao: item.descricao_item,
-                categoria: catNome,
+                categoria,
                 quantidade: 0,
-                unidade: item.unidade_medida,
-                estado: item.estado_conservacao || 'Não se aplica',
-                destino: item.destino_item
+                unidade: 'Itens',
+                destino: item.destino_item || 'Estoque Geral'
             };
         }
         grupos[key].quantidade += parseInt(item.quantidade || 0);
@@ -80,17 +80,15 @@ async function exportarPDFEstoqueOficial() {
 
     const tableRows = Object.values(grupos).map((g, index) => [
         index + 1,
-        g.descricao,
         g.categoria,
         g.quantidade,
         g.unidade,
-        g.estado,
         g.destino
     ]);
 
     doc.autoTable({
         startY: 46,
-        head: [['#', 'Descrição do Item / Material', 'Categoria', 'Qtd Disponível', 'Unidade', 'Estado Conservação', 'Destino Atual']],
+        head: [['#', 'Categoria', 'Total Acumulado', 'Unidade', 'Destino']],
         body: tableRows,
         theme: 'striped',
         headStyles: {
@@ -102,12 +100,10 @@ async function exportarPDFEstoqueOficial() {
         },
         columnStyles: {
             0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 85, fontStyle: 'bold' },
-            2: { cellWidth: 50 },
-            3: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
-            4: { cellWidth: 25 },
-            5: { cellWidth: 34 },
-            6: { cellWidth: 35 }
+            1: { cellWidth: 120, fontStyle: 'bold' },
+            2: { cellWidth: 50, halign: 'center', fontStyle: 'bold' },
+            3: { cellWidth: 40 },
+            4: { cellWidth: 49 }
         },
         bodyStyles: {
             fontSize: 8.5,

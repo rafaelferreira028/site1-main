@@ -110,6 +110,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
 
         if (onLoadingStart) onLoadingStart();
 
+        let idDoacaoGerado = null;
         try {
             const dadosDoacao = {
                 id_doador: parseInt(idDoador),
@@ -124,7 +125,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                 throw new Error('Erro ao obter o ID da doação criada.');
             }
 
-            const idDoacaoGerado = doacaoCriada[0].id_doacao;
+            idDoacaoGerado = doacaoCriada[0].id_doacao;
 
             if (checkFinanceiro) {
                 const dadosFin = {
@@ -154,6 +155,10 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
             resetForm();
             if (onDoacaoRegistrada) onDoacaoRegistrada();
         } catch (err) {
+            if (idDoacaoGerado) {
+                try { await window.doacoesService.deletarDoacaoCompleta(idDoacaoGerado); }
+                catch (cleanupError) { console.error('Não foi possível remover o registro incompleto:', cleanupError); }
+            }
             mostrarToast('Erro ao criar evento de doação: ' + err.message, 'error');
         } finally {
             if (onLoadingEnd) onLoadingEnd();

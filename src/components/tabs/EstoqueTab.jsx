@@ -29,7 +29,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
             setEstoqueDoacoesList(doaData || []);
 
             // Calcular Métricas
-            const bzr = listMat.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
+            const bzr = listMat.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
             const alm = listMat.filter(m => m.id_categoria === 2).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
             const hig = listMat.filter(m => m.id_categoria === 3).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
             const tot = listMat.reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
@@ -104,7 +104,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
     if (estoqueSubTab === 'Geral') {
         materiaisFiltrados = estoqueList;
     } else if (estoqueSubTab === 'Bazar') {
-        materiaisFiltrados = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6 || (m.categorias_itens && m.categorias_itens.nome_categoria.toLowerCase().includes('bazar')));
+        materiaisFiltrados = estoqueList.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar'));
     } else {
         const mapCat = { 'Alimentos': 2, 'Higiene': 3, 'Cabelo': 4, 'Ortopedicos': 5 };
         const catId = mapCat[estoqueSubTab];
@@ -132,7 +132,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
                     descricao: categoria,
                     quantidadeTotal: 0,
                     unidade: 'Itens',
-                    destino: item.destino_item === 'Bazar' || item.id_categoria === 6 ? 'Bazar' : 'Estoque Geral',
+                    destino: item.destino_item || 'Estoque Geral',
                     estado: 'Não se aplica',
                     id_categoria: null,
                     lotes: []

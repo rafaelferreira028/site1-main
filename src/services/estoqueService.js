@@ -57,6 +57,12 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
             qtdLote -= reducao;
             diferencaRestante += reducao;
         }
+        if (qtdLote === 0) {
+            return window.supabaseClient
+                .from('doacoes_materiais')
+                .delete()
+                .eq('id_material', lote.id_material);
+        }
         return window.supabaseClient
             .from('doacoes_materiais')
             .update({

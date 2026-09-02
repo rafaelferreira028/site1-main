@@ -135,7 +135,10 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
         if (!query) return true;
         if (basicMatch) return true;
 
-        const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador);
+                        const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador && (
+                            (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) ||
+                            (d.doacoes_materiais && d.doacoes_materiais.length > 0)
+                        ));
         return doacoesDoDoador.some(doacao => {
             const canalMatch = doacao.canal_recebimento && doacao.canal_recebimento.toLowerCase().includes(query);
             const obsMatch = doacao.observacoes && doacao.observacoes.toLowerCase().includes(query);
@@ -283,7 +286,10 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                     <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Nenhum doador cadastrado ou encontrado.</td></tr>
                                 ) : (
                                     doadoresFiltrados.map(doador => {
-                                        const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador);
+                                        const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador && (
+                                            (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) ||
+                                            (d.doacoes_materiais && d.doacoes_materiais.length > 0)
+                                        ));
                                         let totFinDoador = 0;
                                         let matItemsDoador = [];
 

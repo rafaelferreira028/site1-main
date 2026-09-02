@@ -281,6 +281,9 @@
                         qtdLote -= reducao;
                         diferencaRestante += reducao;
                     }
+                    if (qtdLote === 0) {
+                        return supabaseClient.from('doacoes_materiais').delete().eq('id_material', lote.id_material);
+                    }
                     return supabaseClient.from('doacoes_materiais').update({ quantidade: qtdLote }).eq('id_material', lote.id_material);
                 });
                 const resultados = await Promise.all(updatePromises);
@@ -317,7 +320,7 @@
                 doc.text(`Gerado em: ${dataFormatada} às ${horaFormatada}`, 283, 15, { align: 'right' });
 
                 const totalItens = materiais.reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-                const totalBazar = materiais.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+                const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
                 const totalAlimentos = materiais.filter(m => m.id_categoria === 2).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
                 const totalHigiene = materiais.filter(m => m.id_categoria === 3).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
 
@@ -334,32 +337,32 @@
 
                 const grupos = {};
                 materiais.forEach(item => {
-                    const catNome = item.categorias_itens ? item.categorias_itens.nome_categoria : 'Geral';
-                    const key = `${item.descricao_item.trim().toLowerCase()}_${catNome.toLowerCase()}_${item.destino_item.toLowerCase()}_${item.unidade_medida.toLowerCase()}`;
+                    const categoria = item.destino_item === 'Bazar' || item.id_categoria === 6
+                        ? 'Bazar'
+                        : (item.categorias_itens?.nome_categoria || 'Sem categoria');
+                    const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
                     if (!grupos[key]) {
                         grupos[key] = {
-                            descricao: item.descricao_item,
-                            categoria: catNome,
+                            categoria,
                             quantidade: 0,
-                            unidade: item.unidade_medida,
-                            estado: item.estado_conservacao || 'Não se aplica',
-                            destino: item.destino_item
+                            unidade: 'Itens',
+                            destino: item.destino_item || 'Estoque Geral'
                         };
                     }
                     grupos[key].quantidade += parseInt(item.quantidade || 0);
                 });
 
                 const tableRows = Object.values(grupos).map((g, index) => [
-                    index + 1, g.descricao, g.categoria, g.quantidade, g.unidade, g.estado, g.destino
+                    index + 1, g.categoria, g.quantidade, g.unidade, g.destino
                 ]);
 
                 doc.autoTable({
                     startY: 46,
-                    head: [['#', 'Descrição do Item / Material', 'Categoria', 'Qtd Disponível', 'Unidade', 'Estado Conservação', 'Destino Atual']],
+                    head: [['#', 'Categoria', 'Total Acumulado', 'Unidade', 'Destino']],
                     body: tableRows,
                     theme: 'striped',
                     headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
-                    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 85, fontStyle: 'bold' }, 2: { cellWidth: 50 }, 3: { cellWidth: 30, halign: 'center', fontStyle: 'bold' }, 4: { cellWidth: 25 }, 5: { cellWidth: 34 }, 6: { cellWidth: 35 } },
+                    columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 120, fontStyle: 'bold' }, 2: { cellWidth: 50, halign: 'center', fontStyle: 'bold' }, 3: { cellWidth: 40 }, 4: { cellWidth: 49 } },
                     bodyStyles: { fontSize: 8.5, textColor: [30, 41, 59] },
                     alternateRowStyles: { fillColor: [252, 252, 253] },
                     margin: { left: 14, right: 14 },
@@ -961,12 +964,25 @@
                             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition"><i data-lucide="x" className="w-5 h-5"></i></button>
                         </div>
                         <form id="form-editar-estoque" onSubmit={handleSubmit} className="space-y-4">
-                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)} required disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {modo === 'consolidado' && (
+                                <>
+                                    <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3">
+                                        <p className="text-xs font-bold uppercase tracking-wider text-rose-700">Categoria consolidada</p>
+                                        <p className="mt-1 text-sm font-bold text-slate-800">{descricao}</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Novo total da categoria *</label>
+                                        <input type="number" min="0" step="1" autoFocus value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono focus:border-rose-500" />
+                                    </div>
+                                    <p className="text-xs text-gray-500">O total será aplicado aos lotes desta categoria. Para alterar o destino, edite o lote correspondente.</p>
+                                </>
+                            )}
+                            <div className={modo === 'consolidado' ? 'hidden' : ''}><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)} required disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
+                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${modo === 'consolidado' ? 'hidden' : ''}`}>
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd Total *</label><input type="number" min="0" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${modo === 'consolidado' ? 'hidden' : ''}`}>
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade *</label><select value={unidade} onChange={(e) => setUnidade(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Pacote">Pacote (pct)</option></select></div>
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={destino} onChange={(e) => setDestino(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
                             </div>
@@ -1093,16 +1109,26 @@
                 if (!matQtd || matQtd <= 0) setMatQtd(1);
             };
 
+            const resetForm = () => {
+                setIdDoador(''); setDoadorSearchQuery(''); setDropdownOpen(false);
+                setCanal('Presencial'); setObservacoes('');
+                setCheckFinanceiro(false); setFinValor(''); setFinComprovante('');
+                setCheckMaterial(false); setMatDescricao('');
+                setMatCategoria(categorias[0] ? categorias[0].id_categoria : '');
+                setMatQtd(1); setMatUnidade('Unidade'); setMatEstado('Não se aplica'); setMatDestino('Estoque Geral');
+            };
+
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (!checkFinanceiro && !checkMaterial) { mostrarToast('Marque pelo menos uma opção (Financeira ou Material).', 'error'); return; }
                 if (!idDoador) { mostrarToast('Selecione um doador válido da lista.', 'error'); return; }
                 if (onLoadingStart) onLoadingStart();
+                let idDoacaoGerado = null;
                 try {
                     const { data: doacaoCriada, error: errorPai } = await doacoesService.criarEventoDoacao({ id_doador: parseInt(idDoador), canal_recebimento: canal, observacoes: observacoes || null });
                     if (errorPai) throw errorPai;
                     if (!doacaoCriada || doacaoCriada.length === 0) throw new Error('Não foi possível obter o identificador da doação criada.');
-                    const idDoacaoGerado = doacaoCriada[0].id_doacao;
+                    idDoacaoGerado = doacaoCriada[0].id_doacao;
                     if (checkFinanceiro) {
                         const { error } = await doacoesService.criarDoacaoFinanceira({ id_doacao: idDoacaoGerado, valor: parseFloat(finValor), comprovante_transacao: finComprovante || null });
                         if (error) throw error;
@@ -1113,9 +1139,15 @@
                     }
 
                     mostrarToast('Doação registrada com sucesso!', 'success');
-                    setIdDoador(''); setDoadorSearchQuery(''); setCheckFinanceiro(false); setFinValor(''); setCheckMaterial(false); setMatDescricao(''); setDropdownOpen(false);
+                    resetForm();
                     if (onDoacaoRegistrada) onDoacaoRegistrada();
-                } catch (err) { mostrarToast('Erro ao criar doação: ' + err.message, 'error'); }
+                } catch (err) {
+                    if (idDoacaoGerado) {
+                        try { await doacoesService.deletarDoacaoCompleta(idDoacaoGerado); }
+                        catch (cleanupError) { console.error('Não foi possível remover o registro incompleto:', cleanupError); }
+                    }
+                    mostrarToast('Erro ao criar doação: ' + err.message, 'error');
+                }
                 finally { if (onLoadingEnd) onLoadingEnd(); }
             };
 
@@ -1373,7 +1405,10 @@
                                             <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Nenhum doador encontrado.</td></tr>
                                         ) : (
                                             doadoresFiltrados.map(doador => {
-                                                const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador);
+                                                const doacoesDoDoador = doacoesList.filter(d => d.id_doador === doador.id_doador && (
+                                                    (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) ||
+                                                    (d.doacoes_materiais && d.doacoes_materiais.length > 0)
+                                                ));
                                                 let totFinDoador = 0; let matItemsDoador = [];
                                                 doacoesDoDoador.forEach(d => {
                                                     if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => { totFinDoador += parseFloat(f.valor || 0); });
@@ -1547,7 +1582,7 @@
                     const { data: doaData } = await estoqueService.buscarEstoqueDoacoesCanais();
                     setEstoqueDoacoesList(doaData || []);
 
-                    setTotalBazar(listMat.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
+                    setTotalBazar(listMat.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
                     setTotalAlimentos(listMat.filter(m => m.id_categoria === 2).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
                     setTotalHigiene(listMat.filter(m => m.id_categoria === 3).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
                     setTotalItens(listMat.reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
@@ -1573,7 +1608,7 @@
 
             let materiaisFiltrados = [];
             if (estoqueSubTab === 'Geral') materiaisFiltrados = estoqueList;
-            else if (estoqueSubTab === 'Bazar') materiaisFiltrados = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6);
+            else if (estoqueSubTab === 'Bazar') materiaisFiltrados = estoqueList.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar'));
             else {
                 const mapCat = { 'Alimentos': 2, 'Higiene': 3, 'Cabelo': 4, 'Ortopedicos': 5 };
                 materiaisFiltrados = estoqueList.filter(m => m.id_categoria === mapCat[estoqueSubTab]);
@@ -1584,10 +1619,12 @@
             const gruposConsolidados = {};
             if (modoVisao === 'consolidado') {
                 materiaisFiltrados.forEach(item => {
-                    const categoria = item.categorias_itens?.nome_categoria || 'Sem categoria';
+                    const categoria = item.destino_item === 'Bazar' || item.id_categoria === 6
+                        ? 'Bazar'
+                        : (item.categorias_itens?.nome_categoria || 'Sem categoria');
                     const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
                     if (!gruposConsolidados[key]) {
-                        gruposConsolidados[key] = { key, descricao: categoria, quantidadeTotal: 0, unidade: 'Itens', destino: item.destino_item === 'Bazar' || item.id_categoria === 6 ? 'Bazar' : 'Estoque Geral', lotes: [] };
+                        gruposConsolidados[key] = { key, descricao: categoria, quantidadeTotal: 0, unidade: 'Itens', destino: item.destino_item || 'Estoque Geral', lotes: [] };
                     }
                     gruposConsolidados[key].quantidadeTotal += parseInt(item.quantidade || 0);
                     gruposConsolidados[key].lotes.push(item);
@@ -1632,7 +1669,7 @@
                             <table className="w-full text-left">
                                 <thead>
                                     {modoVisao === 'consolidado' ? (
-                                        <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Item Consolidado</th><th className="px-6 py-3.5 text-center">Total Acumulado</th><th className="px-6 py-3.5">Unidade</th><th className="px-6 py-3.5">Destino</th><th className="px-6 py-3.5 text-center">Ações</th></tr>
+                                        <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Item Consolidado</th><th className="px-6 py-3.5 text-center">Total Acumulado</th><th className="px-6 py-3.5">Unidade</th>{estoqueSubTab !== 'Geral' && <th className="px-6 py-3.5">Destino</th>}<th className="px-6 py-3.5 text-center">Ações</th></tr>
                                     ) : (
                                         <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold"><th className="px-6 py-3.5">Descrição</th><th className="px-6 py-3.5 text-center">Quantidade</th><th className="px-6 py-3.5">Unidade</th><th className="px-6 py-3.5">Destino</th><th className="px-6 py-3.5 text-center">Ações</th></tr>
                                     )}
@@ -1640,7 +1677,7 @@
                                 <tbody className="divide-y divide-gray-100 text-xs">
                                     {modoVisao === 'consolidado' ? (
                                         Object.values(gruposConsolidados).map(g => (
-                                            <tr key={g.key} className="hover:bg-gray-50"><td className="px-6 py-4 font-bold">{g.descricao}</td><td className="px-6 py-4 text-center font-extrabold text-rose-600">{g.quantidadeTotal}</td><td className="px-6 py-4">{g.unidade}</td><td className="px-6 py-4">{g.destino}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoqueConsolidado(g)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
+                                            <tr key={g.key} className="hover:bg-gray-50"><td className="px-6 py-4 font-bold">{g.descricao}</td><td className="px-6 py-4 text-center font-extrabold text-rose-600">{g.quantidadeTotal}</td><td className="px-6 py-4">{g.unidade}</td>{estoqueSubTab !== 'Geral' && <td className="px-6 py-4">{g.destino}</td>}<td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoqueConsolidado(g)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
                                         ))
                                     ) : (
                                         materiaisFiltrados.map(m => (
