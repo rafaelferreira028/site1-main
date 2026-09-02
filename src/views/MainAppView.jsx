@@ -26,6 +26,7 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
 
     const [editEstoqueModalOpen, setEditEstoqueModalOpen] = useState(false);
     const [selectedEstoqueItem, setSelectedEstoqueItem] = useState(null);
+    const [estoqueEditMode, setEstoqueEditMode] = useState('lote');
 
     const carregarDadosApp = async () => {
         try {
@@ -64,7 +65,14 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
     const handleSaveEstoque = async (payload) => {
         if (onLoadingStart) onLoadingStart();
         try {
-            await window.estoqueService.atualizarItemEstoqueLote(payload.idMaterial, { descricao_item: payload.novaDesc, id_categoria: payload.novaCat, quantidade: payload.novaQtd, unidade_medida: payload.novaUnidade, estado_conservacao: payload.novoEstado, destino_item: payload.novoDestino });
+            const novosDados = { descricao_item: payload.novaDesc, id_categoria: payload.novaCat, unidade_medida: payload.novaUnidade, estado_conservacao: payload.novoEstado, destino_item: payload.novoDestino };
+            if (payload.modo === 'consolidado') {
+                if (!selectedEstoqueItem || !selectedEstoqueItem.lotes) throw new Error('Dados dos lotes não encontrados.');
+                const diferenca = payload.novaQtd - selectedEstoqueItem.quantidadeTotal;
+                await window.estoqueService.atualizarEstoqueConsolidado(selectedEstoqueItem.lotes, diferenca, novosDados);
+            } else {
+                await window.estoqueService.atualizarItemEstoqueLote(payload.idMaterial, { ...novosDados, quantidade: payload.novaQtd });
+            }
             mostrarToast('Estoque atualizado com sucesso!', 'success');
             setEditEstoqueModalOpen(false);
             carregarDadosApp();
@@ -80,12 +88,12 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
                 <DoadorTab isVisible={activeTab === 'doador'} onDoadorCadastrado={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
                 <DoacaoMistaTab isVisible={activeTab === 'doacao_mista'} doadores={doadoresGlobal} categorias={categoriasGlobal} onDoacaoRegistrada={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
                 <AdminTab isVisible={activeTab === 'admin'} onOpenEditDoador={(d) => { setSelectedDoador(d); setEditDoadorModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onDataChanged={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
-                <EstoqueTab isVisible={activeTab === 'estoque'} onOpenEditEstoque={(m) => { setSelectedEstoqueItem(m); setEditEstoqueModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                <EstoqueTab isVisible={activeTab === 'estoque'} onOpenEditEstoque={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('lote'); setEditEstoqueModalOpen(true); }} onOpenEditEstoqueConsolidado={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('consolidado'); setEditEstoqueModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
             </main>
 
             <EditDoadorModal isOpen={editDoadorModalOpen} doador={selectedDoador} onClose={() => setEditDoadorModalOpen(false)} onSave={handleSaveDoador} />
             <EditDoacaoModal isOpen={editDoacaoModalOpen} doacao={selectedDoacao} doadores={doadoresGlobal} categorias={categoriasGlobal} onClose={() => setEditDoacaoModalOpen(false)} onSave={handleSaveDoacao} />
-            <EditEstoqueModal isOpen={editEstoqueModalOpen} item={selectedEstoqueItem} modo="lote" categorias={categoriasGlobal} onClose={() => setEditEstoqueModalOpen(false)} onSave={handleSaveEstoque} />
+            <EditEstoqueModal isOpen={editEstoqueModalOpen} item={selectedEstoqueItem} modo={estoqueEditMode} categorias={categoriasGlobal} onClose={() => setEditEstoqueModalOpen(false)} onSave={handleSaveEstoque} />
         </div>
     );
 }

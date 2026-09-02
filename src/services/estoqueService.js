@@ -45,10 +45,17 @@ async function atualizarItemEstoqueLote(idMaterial, dadosItem) {
 
 async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
-    const updatePromises = lotes.map((lote, index) => {
-        let qtdLote = lote.quantidade;
-        if (index === 0) {
-            qtdLote = Math.max(0, lote.quantidade + diferenca);
+    let diferencaRestante = diferenca;
+    const updatePromises = lotes.map((lote) => {
+        const quantidadeAtual = Number(lote.quantidade) || 0;
+        let qtdLote = quantidadeAtual;
+        if (diferencaRestante > 0) {
+            qtdLote += diferencaRestante;
+            diferencaRestante = 0;
+        } else if (diferencaRestante < 0) {
+            const reducao = Math.min(quantidadeAtual, -diferencaRestante);
+            qtdLote -= reducao;
+            diferencaRestante += reducao;
         }
         return window.supabaseClient
             .from('doacoes_materiais')
