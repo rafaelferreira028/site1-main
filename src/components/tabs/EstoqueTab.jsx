@@ -102,7 +102,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
 
     let materiaisFiltrados = [];
     if (estoqueSubTab === 'Geral') {
-        materiaisFiltrados = estoqueList;
+        materiaisFiltrados = estoqueList.filter(m => m.destino_item !== 'Bazar' && m.id_categoria !== 6);
     } else if (estoqueSubTab === 'Bazar') {
         materiaisFiltrados = estoqueList.filter(m => m.destino_item === 'Bazar' || m.id_categoria === 6 || (m.categorias_itens && m.categorias_itens.nome_categoria.toLowerCase().includes('bazar')));
     } else {
@@ -124,16 +124,16 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
     const gruposConsolidados = {};
     if (modoVisao === 'consolidado') {
         materiaisFiltrados.forEach(item => {
-            const key = item.descricao_item.trim().toLowerCase() + '_' + item.unidade_medida;
+            const key = estoqueSubTab === 'Geral' ? 'estoque-geral' : estoqueSubTab.toLowerCase();
             if (!gruposConsolidados[key]) {
                 gruposConsolidados[key] = {
                     key,
-                    descricao: item.descricao_item,
+                    descricao: estoqueSubTab === 'Geral' ? 'Total do Estoque Geral' : `Total do ${estoqueSubTab}`,
                     quantidadeTotal: 0,
-                    unidade: item.unidade_medida,
-                    destino: item.destino_item,
-                    estado: item.estado_conservacao,
-                    id_categoria: item.id_categoria,
+                    unidade: 'Itens',
+                    destino: estoqueSubTab === 'Geral' ? 'Estoque Geral' : item.destino_item,
+                    estado: 'Não se aplica',
+                    id_categoria: null,
                     lotes: []
                 };
             }
@@ -227,7 +227,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
                             onClick={() => { setEstoqueSubTab('Geral'); setSearchQuery(''); }}
                             className={`estoque-sub-btn px-4 py-2.5 text-xs font-bold rounded-xl border focus:outline-none transition-all duration-200 cursor-pointer flex items-center gap-2 ${estoqueSubTab === 'Geral' ? 'bg-rose-600 text-white border-rose-600 shadow-xs' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
                         >
-                            <i data-lucide="layers" className="w-4 h-4"></i> 📦 Estoque Geral (Todos os Itens)
+                            <i data-lucide="layers" className="w-4 h-4"></i> 📦 Estoque Geral
                         </button>
                         <button
                             id="btn-est-Bazar"

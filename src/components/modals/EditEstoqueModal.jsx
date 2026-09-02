@@ -74,6 +74,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                             value={descricao}
                             onChange={(e) => setDescricao(e.target.value)}
                             required
+                            disabled={modo === 'consolidado'}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                         />
                     </div>
@@ -85,6 +86,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                                 id="edit-stock-categoria"
                                 value={categoria}
                                 onChange={(e) => setCategoria(e.target.value)}
+                                disabled={modo === 'consolidado'}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                             >
                                 {categorias.map(c => (
@@ -115,6 +117,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                                 id="edit-stock-unidade"
                                 value={unidade}
                                 onChange={(e) => setUnidade(e.target.value)}
+                                disabled={modo === 'consolidado'}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                             >
                                 <option value="Unidade">Unidade (un)</option>
@@ -130,6 +133,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                                 id="edit-stock-estado"
                                 value={estado}
                                 onChange={(e) => setEstado(e.target.value)}
+                                disabled={modo === 'consolidado'}
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                             >
                                 <option value="Novo">Novo (Lacre de fábrica)</option>
@@ -146,6 +150,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                             id="edit-stock-destino"
                             value={destino}
                             onChange={(e) => setDestino(e.target.value)}
+                            disabled={modo === 'consolidado'}
                             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500"
                         >
                             <option value="Estoque Geral">Estoque Geral (Uso Institucional)</option>

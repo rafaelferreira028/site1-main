@@ -60,7 +60,6 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
         return window.supabaseClient
             .from('doacoes_materiais')
             .update({
-                ...novosDados,
                 quantidade: qtdLote
             })
             .eq('id_material', lote.id_material);
