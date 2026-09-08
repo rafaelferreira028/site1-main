@@ -75,6 +75,45 @@ function limitarAnoDataInput(input) {
     }
 }
 
+function formatarCEP(val) {
+    if (!val) return "";
+    const v = val.replace(/\D/g, "").slice(0, 8);
+    if (v.length > 5) {
+        return `${v.slice(0, 5)}-${v.slice(5)}`;
+    }
+    return v;
+}
+
+async function consultarCEP(cep) {
+    if (!cep) return null;
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return null;
+
+    try {
+        const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+        if (!response.ok) return { error: 'Não foi possível consultar o CEP.' };
+        const data = await response.json();
+        if (data.erro) {
+            return { error: 'CEP não encontrado.' };
+        }
+        
+        const partesLogradouro = [data.logradouro, data.bairro].filter(Boolean);
+        const endereco = partesLogradouro.join(', ');
+        const cidadeUf = data.localidade && data.uf ? `${data.localidade} - ${data.uf}` : (data.localidade || '');
+
+        return {
+            logradouro: data.logradouro || '',
+            bairro: data.bairro || '',
+            cidade: data.localidade || '',
+            uf: data.uf || '',
+            endereco: endereco,
+            cidadeUf: cidadeUf
+        };
+    } catch (err) {
+        return { error: 'Erro ao buscar CEP. Verifique a conexão com a internet.' };
+    }
+}
+
 window.formatarCPF = formatarCPF;
 window.formatarCNPJ = formatarCNPJ;
 window.formatarDocumento = formatarDocumento;
@@ -82,3 +121,5 @@ window.formatarTelefone = formatarTelefone;
 window.formatarMoeda = formatarMoeda;
 window.formatarDataBR = formatarDataBR;
 window.limitarAnoDataInput = limitarAnoDataInput;
+window.formatarCEP = formatarCEP;
+window.consultarCEP = consultarCEP;

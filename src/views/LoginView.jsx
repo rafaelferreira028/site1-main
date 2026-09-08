@@ -36,7 +36,7 @@ function LoginView() {
                     <div className="bg-rose-600 text-white p-3 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center shadow-md shadow-rose-600/20">
                         <i data-lucide="shield-check" className="w-8 h-8"></i>
                     </div>
-                    <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Portal Institucional</h2>
+                    <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Acesso Administrativo</h2>
                     <p className="text-xs text-gray-500 font-medium">Acesso restrito para funcionários e operadores autorizados</p>
                 </div>
 

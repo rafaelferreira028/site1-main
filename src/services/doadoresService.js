@@ -2,7 +2,7 @@ async function buscarDoadores() {
     if (!window.supabaseClient) return { data: [], error: null };
     return await window.supabaseClient
         .from('doadores')
-        .select('id_doador, nome, tipo_doador, documento, telefone, email, cidade, data_nascimento')
+        .select('id_doador, nome, tipo_doador, documento, telefone, email, cep, endereco, cidade, data_nascimento')
         .order('nome');
 }
 
