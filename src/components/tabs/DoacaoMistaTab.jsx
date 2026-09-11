@@ -50,14 +50,16 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
 
     if (!isVisible) return null;
 
-    const doadoresFiltrados = doadores.filter(d => {
-        const query = doadorSearchQuery.toLowerCase().trim();
-        if (!query) return true;
-        return d.nome.toLowerCase().includes(query) ||
-            (d.documento && d.documento.includes(query)) ||
-            (d.telefone && d.telefone.includes(query)) ||
-            (d.email && d.email.toLowerCase().includes(query));
-    });
+    const buscaDoador = doadorSearchQuery.trim().toLowerCase();
+    const documentoBusca = doadorSearchQuery.replace(/\D/g, '');
+    const doadoresFiltrados = buscaDoador
+        ? doadores.filter(d => {
+            const nomeConfere = d.nome.toLowerCase().includes(buscaDoador);
+            const documentoConfere = documentoBusca.length > 0 &&
+                (d.documento || '').replace(/\D/g, '').includes(documentoBusca);
+            return nomeConfere || documentoConfere;
+        })
+        : [];
 
     const resetForm = () => {
         setIdDoador('');
@@ -199,7 +201,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                             )}
                         </div>
 
-                        {dropdownOpen && (
+                        {dropdownOpen && buscaDoador && (
                             <div id="dropdown-doadores-form" className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
                                 {doadoresFiltrados.length === 0 ? (
                                     <div className="p-4 text-center text-xs text-gray-400 font-medium">Nenhum doador encontrado.</div>

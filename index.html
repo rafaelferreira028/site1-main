@@ -978,7 +978,7 @@
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Doador Vinculado *</label>
                                     <input type="text" value={doadorSearchQuery} onChange={(e) => { setDoadorSearchQuery(e.target.value); setDropdownOpen(true); }} onFocus={() => setDropdownOpen(true)} className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm ${idDoador ? 'bg-rose-50/50 border-rose-300 font-semibold' : ''}`} />
                                     {dropdownOpen && (
-                                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
+                                    <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
                                             {doadoresFiltrados.map(d => (
                                                 <div key={d.id_doador} onMouseDown={() => { setIdDoador(d.id_doador); setDoadorSearchQuery(d.nome); setDropdownOpen(false); }} className="p-3 hover:bg-rose-50 cursor-pointer border-b border-gray-50 text-sm font-semibold">{d.nome}</div>
                                             ))}
@@ -1220,10 +1220,16 @@
             useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, checkFinanceiro, checkMaterial, dropdownOpen]);
             if (!isVisible) return null;
 
-            const doadoresFiltrados = doadores.filter(d => {
-                const q = doadorSearchQuery.toLowerCase().trim();
-                return !q || d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q));
-            });
+            const buscaDoador = doadorSearchQuery.trim().toLowerCase();
+            const documentoBusca = doadorSearchQuery.replace(/\D/g, '');
+            const doadoresFiltrados = buscaDoador
+                ? doadores.filter(d => {
+                    const nomeConfere = d.nome.toLowerCase().includes(buscaDoador);
+                    const documentoConfere = documentoBusca.length > 0 &&
+                        (d.documento || '').replace(/\D/g, '').includes(documentoBusca);
+                    return nomeConfere || documentoConfere;
+                })
+                : [];
 
             const selecionarPreset = (tipo) => {
                 const presets = {
@@ -1294,7 +1300,7 @@
                                         <button type="button" onClick={() => { setIdDoador(''); setDoadorSearchQuery(''); setDropdownOpen(false); }} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5 rounded-full hover:bg-gray-100 transition"><i data-lucide="x" className="w-4 h-4"></i></button>
                                     )}
                                 </div>
-                                {dropdownOpen && (
+                                {dropdownOpen && buscaDoador && (
                                     <div className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-30">
                                         {doadoresFiltrados.length === 0 ? (
                                             <div className="p-4 text-center text-xs text-gray-400">Nenhum doador encontrado.</div>
