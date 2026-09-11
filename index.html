@@ -146,6 +146,14 @@
                 if (!supabaseClient) throw new Error("Supabase não configurado");
                 return await supabaseClient.auth.signInWithPassword({ email, password });
             },
+            criarLoginSupabase: async (nome, email, password) => {
+                if (!supabaseClient) throw new Error("Supabase nao configurado");
+                return await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: { data: { name: nome || email } }
+                });
+            },
             realizarLogoutSupabase: async () => {
                 if (!supabaseClient) return;
                 return await supabaseClient.auth.signOut();
@@ -548,8 +556,26 @@
                 }
             };
 
+            const register = async (nome, email, password) => {
+                if (onLoadingStart) onLoadingStart();
+                try {
+                    const { data, error } = await authService.criarLoginSupabase(nome, email, password);
+                    if (error) throw error;
+                    if (data && data.session) {
+                        setAuthenticated(true);
+                        setSession(data.session);
+                        return { success: true, needsConfirmation: false };
+                    }
+                    return { success: true, needsConfirmation: true };
+                } catch (error) {
+                    return { success: false, error };
+                } finally {
+                    if (onLoadingEnd) onLoadingEnd();
+                }
+            };
+
             return (
-                <AuthContext.Provider value={{ authenticated, session, login, logout, checkAuth }}>
+                <AuthContext.Provider value={{ authenticated, session, login, register, logout, checkAuth }}>
                     {children}
                 </AuthContext.Provider>
             );
@@ -726,9 +752,6 @@
                         <button id="btn-global-logout" onClick={logout} className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 hover:bg-rose-600 hover:text-white transition duration-150 focus:outline-none cursor-pointer flex items-center gap-1.5" title="Sair do Sistema">
                             <i data-lucide="log-out" className="w-4 h-4"></i><span>Sair</span>
                         </button>
-                        <div className="hidden md:flex items-center gap-2 bg-rose-50/60 border border-rose-100 px-3.5 py-1.5 rounded-full text-rose-700 font-semibold text-xs">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span><span>Ambiente Seguro</span>
-                        </div>
                     </div>
                 </header>
             );
@@ -1347,6 +1370,7 @@
             const [adminSubTab, setAdminSubTab] = useState('doadores');
             const [searchQuery, setSearchQuery] = useState('');
             const [expandedDoadorId, setExpandedDoadorId] = useState(null);
+            const [paginaDoacoes, setPaginaDoacoes] = useState(1);
 
             const [doadoresList, setDoadoresList] = useState([]);
             const [doacoesList, setDoacoesList] = useState([]);
@@ -1392,7 +1416,8 @@
             };
 
             useEffect(() => { if (isVisible) carregarDadosAdmin(); }, [isVisible]);
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId, paginaDoacoes]);
+            useEffect(() => { setPaginaDoacoes(1); }, [searchQuery, adminSubTab]);
             if (!isVisible) return null;
 
             const handleDeleteDoador = async (idDoador, nome) => {
@@ -1467,6 +1492,12 @@
                 return nomeDoador.includes(query) || canal.includes(query) || obs.includes(query) || detMatch;
             });
 
+            const registrosPorPagina = 10;
+            const totalPaginasDoacoes = Math.max(1, Math.ceil(doacoesFiltradas.length / registrosPorPagina));
+            const paginaAtualDoacoes = Math.min(paginaDoacoes, totalPaginasDoacoes);
+            const inicioPaginaDoacoes = (paginaAtualDoacoes - 1) * registrosPorPagina;
+            const doacoesDaPagina = doacoesFiltradas.slice(inicioPaginaDoacoes, inicioPaginaDoacoes + registrosPorPagina);
+
             return (
                 <div id="tab-admin" className="tab-content active visible space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1479,8 +1510,8 @@
                     <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-100 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
                             <div className="flex items-center gap-2 bg-slate-200 p-1.5 rounded-2xl">
-                                <button onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doadores' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}><i data-lucide="users" className="w-4 h-4"></i> Tabela de Doadores</button>
-                                <button onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doacoes' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}><i data-lucide="heart-handshake" className="w-4 h-4"></i> Histórico de Doações</button>
+                                <button onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); setPaginaDoacoes(1); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doadores' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}><i data-lucide="users" className="w-4 h-4"></i> Tabela de Doadores</button>
+                                <button onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); setPaginaDoacoes(1); }} className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doacoes' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}><i data-lucide="heart-handshake" className="w-4 h-4"></i> Histórico de Doações</button>
                             </div>
                             <div className="flex items-center gap-3">
                                 <div className="relative flex-1 md:w-64">
@@ -1603,7 +1634,7 @@
                                         ) : doacoesFiltradas.length === 0 ? (
                                             <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Nenhuma doação encontrada.</td></tr>
                                         ) : (
-                                            doacoesFiltradas.map(doacao => {
+                                            doacoesDaPagina.map(doacao => {
                                                 const nomeDoador = doacao.doadores ? doacao.doadores.nome : 'Doador Desconhecido';
                                                 const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
                                                 const hasFin = doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0;
@@ -1660,6 +1691,18 @@
                                         )}
                                     </tbody>
                                 </table>
+                                {!loadingData && doacoesFiltradas.length > 0 && (
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-gray-100">
+                                        <span className="text-xs text-gray-500">
+                                            Mostrando {inicioPaginaDoacoes + 1}-{Math.min(inicioPaginaDoacoes + registrosPorPagina, doacoesFiltradas.length)} de {doacoesFiltradas.length} doações
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <button type="button" onClick={() => setPaginaDoacoes(p => Math.max(1, p - 1))} disabled={paginaAtualDoacoes === 1} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:border-rose-300 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">Anterior</button>
+                                            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg">Página {paginaAtualDoacoes} de {totalPaginasDoacoes}</span>
+                                            <button type="button" onClick={() => setPaginaDoacoes(p => Math.min(totalPaginasDoacoes, p + 1))} disabled={paginaAtualDoacoes === totalPaginasDoacoes} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:border-rose-300 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">Próxima</button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1803,38 +1846,109 @@
         // 7. VIEWS E ORQUESTRADOR PRINCIPAL
         // ==========================================
         function LoginView() {
-            const { login } = useAuth();
+            const { login, register } = useAuth();
+            const [mode, setMode] = useState('login');
+            const [name, setName] = useState('');
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
+            const [confirmPassword, setConfirmPassword] = useState('');
             const [errorMsg, setErrorMsg] = useState('');
+            const [successMsg, setSuccessMsg] = useState('');
+            const [isSubmitting, setIsSubmitting] = useState(false);
 
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [errorMsg]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [mode, errorMsg, successMsg, isSubmitting]);
 
-            const handleSubmit = async (e) => {
+            const switchMode = (nextMode) => {
+                setMode(nextMode);
+                setErrorMsg('');
+                setSuccessMsg('');
+                setPassword('');
+                setConfirmPassword('');
+            };
+
+            const handleLoginSubmit = async (e) => {
                 e.preventDefault();
                 setErrorMsg('');
+                setIsSubmitting(true);
                 const res = await login(email, password);
                 if (!res.success) {
                     setErrorMsg(res.error ? res.error.message : 'Credenciais inválidas.');
                     setPassword('');
                 }
+                setIsSubmitting(false);
+            };
+
+            const handleRegisterSubmit = async (e) => {
+                e.preventDefault();
+                setErrorMsg('');
+                setSuccessMsg('');
+                if (password.length < 6) {
+                    setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    setErrorMsg('As senhas nao coincidem.');
+                    return;
+                }
+                setIsSubmitting(true);
+                const res = await register(name.trim(), email.trim(), password);
+                setIsSubmitting(false);
+                if (!res.success) {
+                    setErrorMsg(res.error ? res.error.message : 'Nao foi possivel criar o login.');
+                    return;
+                }
+                if (res.needsConfirmation) {
+                    setSuccessMsg('Cadastro criado. Verifique seu e-mail para confirmar o acesso antes de entrar.');
+                    setPassword('');
+                    setConfirmPassword('');
+                }
             };
 
             return (
-                <div id="global-login-container" className="min-h-screen flex items-center justify-center bg-slate-50 px-4 relative">
+                <div id="global-login-container" className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#05080e] px-4 relative transition-colors duration-200">
                     <div className="absolute top-6 right-6 z-20"><ThemeSelector /></div>
-                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 max-w-md w-full relative z-10 space-y-6">
+                    <div className="bg-white dark:bg-[#0f172a] p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-slate-800 max-w-md w-full relative z-10 space-y-6">
                         <div className="text-center space-y-2">
-                            <div className="bg-rose-600 text-white p-3 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center shadow-md"><i data-lucide="shield-check" className="w-8 h-8"></i></div>
-                            <h2 className="text-2xl font-extrabold text-slate-900">Acesso Administrativo</h2>
-                            <p className="text-xs text-gray-500 font-medium">Acesso restrito para operadores autorizados</p>
+                            <div className="bg-rose-600 text-white p-3 rounded-2xl w-14 h-14 mx-auto flex items-center justify-center shadow-md"><i data-lucide={mode === 'login' ? 'shield-check' : 'user-plus'} className="w-8 h-8"></i></div>
+                            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">{mode === 'login' ? 'Acesso Administrativo' : 'Criar novo login'}</h2>
+                            <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">{mode === 'login' ? 'Acesso restrito para operadores autorizados' : 'Cadastre um novo acesso para o sistema'}</p>
                         </div>
-                        <form id="form-global-login" onSubmit={handleSubmit} className="space-y-4">
+                        <div className="flex bg-gray-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-700">
+                            <button type="button" onClick={() => switchMode('login')} className={`flex-1 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${mode === 'login' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>Entrar</button>
+                            <button type="button" onClick={() => switchMode('register')} className={`flex-1 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${mode === 'register' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>Criar login</button>
+                        </div>
+                        {mode === 'login' && (
+                        <form id="form-global-login" onSubmit={handleLoginSubmit} className="space-y-4">
                             <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail Corporativo</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="E-mail de Acesso" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
                             <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Senha de Acesso</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Senha de Acesso" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
                             {errorMsg && <p className="text-xs font-bold text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-center gap-2"><i data-lucide="alert-triangle" className="w-4 h-4"></i> {errorMsg}</p>}
                             <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2"><i data-lucide="log-in" className="w-4 h-4"></i> Entrar no Sistema</button>
                         </form>
+                        )}
+
+                        {mode === 'register' && (
+                            <form id="form-global-register" onSubmit={handleRegisterSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">Nome</label>
+                                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do operador (opcional)" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">E-mail de acesso</label>
+                                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="nome@empresa.com" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">Senha</label>
+                                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength="6" placeholder="Minimo de 6 caracteres" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">Confirmar senha</label>
+                                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength="6" placeholder="Repita a senha" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
+                                </div>
+                                {errorMsg && <p className="text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-100 dark:border-rose-800 flex items-center gap-2"><i data-lucide="alert-triangle" className="w-4 h-4"></i>{errorMsg}</p>}
+                                {successMsg && <p className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-100 dark:border-emerald-800 flex items-center gap-2"><i data-lucide="check-circle-2" className="w-4 h-4"></i>{successMsg}</p>}
+                                <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"><i data-lucide="user-plus" className="w-4 h-4"></i>{isSubmitting ? 'Criando...' : 'Criar login'}</button>
+                            </form>
+                        )}
                     </div>
                 </div>
             );

@@ -6,6 +6,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
     const [adminSubTab, setAdminSubTab] = useState('doadores');
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedDoadorId, setExpandedDoadorId] = useState(null);
+    const [paginaDoacoes, setPaginaDoacoes] = useState(1);
 
     const [doadoresList, setDoadoresList] = useState([]);
     const [doacoesList, setDoacoesList] = useState([]);
@@ -66,7 +67,11 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId]);
+    }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId, paginaDoacoes]);
+
+    useEffect(() => {
+        setPaginaDoacoes(1);
+    }, [searchQuery, adminSubTab]);
 
     if (!isVisible) return null;
 
@@ -170,6 +175,12 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
         return nomeDoador.includes(query) || canal.includes(query) || obs.includes(query) || detMatch;
     });
 
+    const registrosPorPagina = 10;
+    const totalPaginasDoacoes = Math.max(1, Math.ceil(doacoesFiltradas.length / registrosPorPagina));
+    const paginaAtualDoacoes = Math.min(paginaDoacoes, totalPaginasDoacoes);
+    const inicioPaginaDoacoes = (paginaAtualDoacoes - 1) * registrosPorPagina;
+    const doacoesDaPagina = doacoesFiltradas.slice(inicioPaginaDoacoes, inicioPaginaDoacoes + registrosPorPagina);
+
     return (
         <div id="tab-admin" className="tab-content active visible space-y-6">
             {/* Grid de Cards KPIs */}
@@ -221,14 +232,14 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                     <div className="flex items-center gap-2 bg-slate-200 p-1.5 rounded-2xl">
                         <button
                             id="btn-sub-doadores"
-                            onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); }}
+                            onClick={() => { setAdminSubTab('doadores'); setSearchQuery(''); setPaginaDoacoes(1); }}
                             className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doadores' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
                         >
                             <i data-lucide="users" className="w-4 h-4"></i> Tabela de Doadores
                         </button>
                         <button
                             id="btn-sub-doacoes"
-                            onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); }}
+                            onClick={() => { setAdminSubTab('doacoes'); setSearchQuery(''); setPaginaDoacoes(1); }}
                             className={`sub-tab-btn px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-2 ${adminSubTab === 'doacoes' ? 'bg-white shadow-md text-rose-600' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'}`}
                         >
                             <i data-lucide="heart-handshake" className="w-4 h-4"></i> Histórico de Doações
@@ -447,7 +458,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                 ) : doacoesFiltradas.length === 0 ? (
                                     <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Nenhuma doação registrada ou encontrada.</td></tr>
                                 ) : (
-                                    doacoesFiltradas.map(doacao => {
+                                    doacoesDaPagina.map(doacao => {
                                         const nomeDoador = doacao.doadores ? doacao.doadores.nome : 'Doador Desconhecido';
                                         const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
 
@@ -513,6 +524,18 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
                                 )}
                             </tbody>
                         </table>
+                        {!loadingData && doacoesFiltradas.length > 0 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-gray-100">
+                                <span className="text-xs text-gray-500">
+                                    Mostrando {inicioPaginaDoacoes + 1}-{Math.min(inicioPaginaDoacoes + registrosPorPagina, doacoesFiltradas.length)} de {doacoesFiltradas.length} doações
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button type="button" onClick={() => setPaginaDoacoes(p => Math.max(1, p - 1))} disabled={paginaAtualDoacoes === 1} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:border-rose-300 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">Anterior</button>
+                                    <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg">Página {paginaAtualDoacoes} de {totalPaginasDoacoes}</span>
+                                    <button type="button" onClick={() => setPaginaDoacoes(p => Math.min(totalPaginasDoacoes, p + 1))} disabled={paginaAtualDoacoes === totalPaginasDoacoes} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:border-rose-300 hover:text-rose-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">Próxima</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
