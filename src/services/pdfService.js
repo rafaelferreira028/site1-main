@@ -42,11 +42,16 @@ async function exportarPDFEstoqueOficial() {
     doc.setFontSize(9);
     doc.text(`Gerado em: ${dataFormatada} às ${horaFormatada}`, 283, 15, { align: 'right' });
 
+    const parseQtd = (val) => {
+        const n = parseFloat(val);
+        return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+    };
+
     // 2. Resumo de Métricas (Cards no PDF)
-    const totalItens = materiais.reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-    const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-    const totalAlimentos = materiais.filter(m => m.id_categoria === 2).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-    const totalHigiene = materiais.filter(m => m.id_categoria === 3).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+    const totalItens = materiais.reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
+    const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar') || m.destino_item?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
+    const totalAlimentos = materiais.filter(m => m.id_categoria === 2 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('alimento')).reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
+    const totalHigiene = materiais.filter(m => m.id_categoria === 3 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('higiene')).reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
 
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
@@ -71,11 +76,11 @@ async function exportarPDFEstoqueOficial() {
             grupos[key] = {
                 categoria,
                 quantidade: 0,
-                unidade: 'Itens',
+                unidade: item.unidade_medida || 'Itens',
                 destino: item.destino_item || 'Estoque Geral'
             };
         }
-        grupos[key].quantidade += parseInt(item.quantidade || 0);
+        grupos[key].quantidade += parseQtd(item.quantidade);
     });
 
     const tableRows = Object.values(grupos).map((g, index) => [
@@ -173,13 +178,23 @@ async function exportarPDFDoacoesOficial() {
     let totalMatQtd = 0;
     const doadoresSet = new Set();
 
+    const parseQtdMat = (val) => {
+        const n = parseFloat(val);
+        return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+    };
+
     doacoes.forEach(d => {
-        if (d.doadores && d.doadores.nome) doadoresSet.add(d.doadores.nome);
+        const idDoadorUnico = d.id_doador || (d.doadores && d.doadores.nome);
+        if (idDoadorUnico) doadoresSet.add(idDoadorUnico);
+
         if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) {
-            d.doacoes_financeiras.forEach(f => { totalFin += parseFloat(f.valor || 0); });
+            d.doacoes_financeiras.forEach(f => {
+                const val = window.sanitizarValorMonetario ? window.sanitizarValorMonetario(f.valor) : (parseFloat(f.valor) || 0);
+                totalFin += val;
+            });
         }
         if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {
-            d.doacoes_materiais.forEach(m => { totalMatQtd += parseInt(m.quantidade || 0); });
+            d.doacoes_materiais.forEach(m => { totalMatQtd += parseQtdMat(m.quantidade); });
         }
     });
 
@@ -193,18 +208,21 @@ async function exportarPDFDoacoesOficial() {
     doc.text(`TOTAL DOAÇÕES: ${doacoes.length}`, 20, 36.5);
     doc.text(`DOADORES ÚNICOS: ${doadoresSet.size}`, 85, 36.5);
     doc.text(`TOTAL FINANCEIRO: R$ ${totalFin.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 36.5);
-    doc.text(`TOTAL MATERIAIS: ${totalMatQtd} itens`, 230, 36.5);
+    doc.text(`TOTAL MATERIAIS: ${Math.round(totalMatQtd * 100) / 100} itens`, 230, 36.5);
 
     // 3. Tabela Consolidada de Doações
     const tableRows = doacoes.map((d, index) => {
         const nomeDoador = d.doadores ? d.doadores.nome : 'Doador Desconhecido';
-        const dataDoacaoFmt = d.data_doacao ? new Date(d.data_doacao).toLocaleDateString('pt-BR') : '-';
+        const dataDoacaoFmt = window.parseDataSeguraBR
+            ? window.parseDataSeguraBR(d.data_doacao)
+            : (d.data_doacao ? String(d.data_doacao).split('T')[0].split('-').reverse().join('/') : '-');
         
         const detalhesArr = [];
         if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) {
             d.doacoes_financeiras.forEach(f => {
                 const compStr = f.comprovante_transacao ? ` (Nº ${f.comprovante_transacao})` : '';
-                detalhesArr.push(`[Fin] R$ ${parseFloat(f.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${compStr}`);
+                const v = window.sanitizarValorMonetario ? window.sanitizarValorMonetario(f.valor) : (parseFloat(f.valor) || 0);
+                detalhesArr.push(`[Fin] R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${compStr}`);
             });
         }
         if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {

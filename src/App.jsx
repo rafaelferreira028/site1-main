@@ -14,21 +14,33 @@ function AppContent() {
 
     const [progressWidth, setProgressWidth] = useState(0);
     const [progressOpacity, setProgressOpacity] = useState(0);
+    const progressTimersRef = React.useRef([]);
+
+    const clearProgressTimers = () => {
+        progressTimersRef.current.forEach(id => clearTimeout(id));
+        progressTimersRef.current = [];
+    };
 
     const handleLoadingStart = () => {
+        clearProgressTimers();
         setProgressOpacity(1);
         setProgressWidth(0);
-        setTimeout(() => setProgressWidth(30), 50);
-        setTimeout(() => setProgressWidth(70), 200);
+        progressTimersRef.current.push(setTimeout(() => setProgressWidth(30), 50));
+        progressTimersRef.current.push(setTimeout(() => setProgressWidth(70), 200));
     };
 
     const handleLoadingEnd = () => {
+        clearProgressTimers();
         setProgressWidth(100);
-        setTimeout(() => {
+        progressTimersRef.current.push(setTimeout(() => {
             setProgressOpacity(0);
-            setTimeout(() => setProgressWidth(0), 300);
-        }, 200);
+            progressTimersRef.current.push(setTimeout(() => setProgressWidth(0), 300));
+        }, 200));
     };
+
+    useEffect(() => {
+        return () => clearProgressTimers();
+    }, []);
 
     return (
         <ThemeProvider onShowToast={mostrarToast}>

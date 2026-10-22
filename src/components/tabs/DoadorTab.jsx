@@ -13,12 +13,13 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
     const [cidade, setCidade] = useState('');
     const [dataNascimento, setDataNascimento] = useState('');
     const [isBuscaCepLoading, setIsBuscaCepLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, tipoDoador, isBuscaCepLoading]);
+    }, [isVisible, tipoDoador, isBuscaCepLoading, isSubmitting]);
 
     if (!isVisible) return null;
 
@@ -33,6 +34,7 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
         setCidade('');
         setDataNascimento('');
         setIsBuscaCepLoading(false);
+        setIsSubmitting(false);
     };
 
     const handleCepChange = async (e) => {
@@ -43,20 +45,24 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
         const cepDigitos = valor.replace(/\D/g, '');
         if (cepDigitos.length === 8) {
             setIsBuscaCepLoading(true);
-            const fnConsulta = window.consultarCEP || (typeof consultarCEP !== 'undefined' ? consultarCEP : null);
-            if (fnConsulta) {
-                const res = await fnConsulta(cepDigitos);
-                setIsBuscaCepLoading(false);
-                if (res) {
-                    if (res.error) {
-                        mostrarToast(res.error, 'warning');
-                    } else {
-                        if (res.cidadeUf) setCidade(res.cidadeUf);
-                        if (res.endereco) setEndereco(res.endereco);
-                        mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+            try {
+                const fnConsulta = window.consultarCEP || (typeof consultarCEP !== 'undefined' ? consultarCEP : null);
+                if (fnConsulta) {
+                    const res = await fnConsulta(cepDigitos);
+                    if (res) {
+                        if (res.error) {
+                            mostrarToast(res.error, 'warning');
+                        } else {
+                            if (res.cidadeUf) setCidade(res.cidadeUf);
+                            if (res.endereco) setEndereco(res.endereco);
+                            mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+                        }
                     }
                 }
-            } else {
+            } catch (err) {
+                console.error("Falha ao consultar CEP:", err);
+                mostrarToast('Não foi possível obter dados automáticos do CEP.', 'warning');
+            } finally {
                 setIsBuscaCepLoading(false);
             }
         }
@@ -64,17 +70,26 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
+        const nomeLimpo = nome ? nome.trim() : '';
+        if (!nomeLimpo) {
+            mostrarToast('Por favor, informe o nome ou razão social do doador.', 'error');
+            return;
+        }
+
+        setIsSubmitting(true);
         if (onLoadingStart) onLoadingStart();
 
         const novoDoador = {
-            nome,
+            nome: nomeLimpo,
             tipo_doador: tipoDoador,
-            documento: documento || null,
-            telefone: telefone || null,
-            email: email || null,
-            cep: cep || null,
-            endereco: endereco || null,
-            cidade: cidade || null,
+            documento: documento ? documento.trim() : null,
+            telefone: telefone ? telefone.trim() : null,
+            email: email ? email.trim() : null,
+            cep: cep ? cep.trim() : null,
+            endereco: endereco ? endereco.trim() : null,
+            cidade: cidade ? cidade.trim() : null,
             data_nascimento: dataNascimento || null
         };
 
@@ -90,6 +105,7 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
         } catch (err) {
             mostrarToast('Erro ao salvar doador: ' + err.message, 'error');
         } finally {
+            setIsSubmitting(false);
             if (onLoadingEnd) onLoadingEnd();
         }
     };
@@ -244,9 +260,13 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
                 <div className="pt-4 flex justify-end">
                     <button
                         type="submit"
-                        className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition duration-150 cursor-pointer flex items-center gap-2"
+                        disabled={isSubmitting}
+                        className={`bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md transition duration-150 flex items-center gap-2 ${
+                            isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-rose-700 cursor-pointer'
+                        }`}
                     >
-                        <i data-lucide="save" className="w-5 h-5"></i> Salvar Doador
+                        <i data-lucide={isSubmitting ? "loader-2" : "save"} className={`w-5 h-5 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                        <span>{isSubmitting ? 'Salvando...' : 'Salvar Doador'}</span>
                     </button>
                 </div>
             </form>

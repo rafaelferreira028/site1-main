@@ -82,18 +82,25 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const valorFinLimpo = checkFinanceiro
+            ? (window.sanitizarValorMonetario ? window.sanitizarValorMonetario(finValor) : (parseFloat(String(finValor).replace(',', '.')) || 0))
+            : null;
+        const qtdMatLimpa = checkMaterial
+            ? (parseFloat(matQtd) || 1)
+            : 1;
+
         onSave({
-            idDoacao: parseInt(idDoacao),
-            idDoador: parseInt(idDoador),
+            idDoacao: parseInt(idDoacao, 10),
+            idDoador: parseInt(idDoador, 10),
             canal,
-            observacoes,
+            observacoes: observacoes ? observacoes.trim() : null,
             checkFinanceiro,
             checkMaterial,
-            finValor: parseFloat(finValor),
-            finComprovante,
-            matDescricao,
-            matCategoria: parseInt(matCategoria),
-            matQtd: parseInt(matQtd),
+            finValor: valorFinLimpo,
+            finComprovante: finComprovante ? finComprovante.trim() : null,
+            matDescricao: matDescricao ? matDescricao.trim() : '',
+            matCategoria: parseInt(matCategoria, 10) || null,
+            matQtd: Math.round(qtdMatLimpa * 100) / 100,
             matUnidade,
             matEstado,
             matDestino

@@ -17,22 +17,29 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
     const [totalHigiene, setTotalHigiene] = useState(0);
     const [totalItens, setTotalItens] = useState(0);
 
+    const parseQtdMat = (val) => {
+        const n = parseFloat(val);
+        return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+    };
+
     const carregarDadosEstoque = async () => {
         setLoadingData(true);
         if (onLoadingStart) onLoadingStart();
         try {
-            const { data: matData } = await window.estoqueService.buscarEstoqueMateriais();
+            const { data: matData, error: errMat } = await window.estoqueService.buscarEstoqueMateriais();
+            if (errMat) throw errMat;
             const listMat = matData || [];
             setEstoqueList(listMat);
 
-            const { data: doaData } = await window.estoqueService.buscarEstoqueDoacoesCanais();
+            const { data: doaData, error: errDoa } = await window.estoqueService.buscarEstoqueDoacoesCanais();
+            if (errDoa) throw errDoa;
             setEstoqueDoacoesList(doaData || []);
 
             // Calcular Métricas
-            const bzr = listMat.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
-            const alm = listMat.filter(m => m.id_categoria === 2).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
-            const hig = listMat.filter(m => m.id_categoria === 3).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
-            const tot = listMat.reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0);
+            const bzr = listMat.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar') || m.destino_item?.toLowerCase().includes('bazar')).reduce((acc, item) => acc + parseQtdMat(item.quantidade), 0);
+            const alm = listMat.filter(m => m.id_categoria === 2 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('alimento')).reduce((acc, item) => acc + parseQtdMat(item.quantidade), 0);
+            const hig = listMat.filter(m => m.id_categoria === 3 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('higiene')).reduce((acc, item) => acc + parseQtdMat(item.quantidade), 0);
+            const tot = listMat.reduce((acc, item) => acc + parseQtdMat(item.quantidade), 0);
 
             setTotalBazar(bzr);
             setTotalAlimentos(alm);
@@ -40,6 +47,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
             setTotalItens(tot);
         } catch (e) {
             console.error("Erro ao carregar estoque:", e);
+            mostrarToast('Falha ao carregar itens do estoque. Verifique sua conexão.', 'error');
         } finally {
             setLoadingData(false);
             if (onLoadingEnd) onLoadingEnd();
@@ -87,13 +95,19 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
             let hasFinMatch = false;
 
             if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) {
-                const fin = d.doacoes_financeiras[0];
-                hasFinMatch = String(fin.valor).includes(query) || (fin.comprovante_transacao && fin.comprovante_transacao.toLowerCase().includes(query));
+                hasFinMatch = d.doacoes_financeiras.some(fin => 
+                    String(fin.valor).includes(query) || 
+                    (fin.comprovante_transacao && fin.comprovante_transacao.toLowerCase().includes(query))
+                );
             }
             if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {
-                const mat = d.doacoes_materiais[0];
-                const catName = mat.categorias_itens ? mat.categorias_itens.nome_categoria.toLowerCase() : '';
-                hasMatMatch = mat.descricao_item.toLowerCase().includes(query) || catName.includes(query) || mat.destino_item.toLowerCase().includes(query) || mat.estado_conservacao.toLowerCase().includes(query);
+                hasMatMatch = d.doacoes_materiais.some(mat => {
+                    const catName = mat.categorias_itens ? mat.categorias_itens.nome_categoria.toLowerCase() : '';
+                    return (mat.descricao_item && mat.descricao_item.toLowerCase().includes(query)) ||
+                        catName.includes(query) ||
+                        (mat.destino_item && mat.destino_item.toLowerCase().includes(query)) ||
+                        (mat.estado_conservacao && mat.estado_conservacao.toLowerCase().includes(query));
+                });
             }
 
             return obs.includes(query) || hasFinMatch || hasMatMatch;
@@ -104,7 +118,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
     if (estoqueSubTab === 'Geral') {
         materiaisFiltrados = estoqueList;
     } else if (estoqueSubTab === 'Bazar') {
-        materiaisFiltrados = estoqueList.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar'));
+        materiaisFiltrados = estoqueList.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar') || m.destino_item?.toLowerCase().includes('bazar'));
     } else {
         const mapCat = { 'Alimentos': 2, 'Higiene': 3, 'Cabelo': 4, 'Ortopedicos': 5 };
         const catId = mapCat[estoqueSubTab];
@@ -113,10 +127,10 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
 
     if (query) {
         materiaisFiltrados = materiaisFiltrados.filter(m => {
-            const desc = m.descricao_item.toLowerCase();
-            const destino = m.destino_item.toLowerCase();
-            const estado = m.estado_conservacao.toLowerCase();
-            const unidade = m.unidade_medida.toLowerCase();
+            const desc = (m.descricao_item || '').toLowerCase();
+            const destino = (m.destino_item || '').toLowerCase();
+            const estado = (m.estado_conservacao || '').toLowerCase();
+            const unidade = (m.unidade_medida || '').toLowerCase();
             return desc.includes(query) || destino.includes(query) || estado.includes(query) || unidade.includes(query);
         });
     }
@@ -131,14 +145,14 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
                     key,
                     descricao: categoria,
                     quantidadeTotal: 0,
-                    unidade: 'Itens',
+                    unidade: item.unidade_medida || 'Itens',
                     destino: item.destino_item || 'Estoque Geral',
                     estado: 'Não se aplica',
-                    id_categoria: null,
+                    id_categoria: item.id_categoria || null,
                     lotes: []
                 };
             }
-            gruposConsolidados[key].quantidadeTotal += parseInt(item.quantidade || 0);
+            gruposConsolidados[key].quantidadeTotal = Math.round((gruposConsolidados[key].quantidadeTotal + parseQtdMat(item.quantidade)) * 100) / 100;
             gruposConsolidados[key].lotes.push(item);
         });
     }

@@ -25,15 +25,21 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
             const { count: doacoesCount } = await window.supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
 
             const { data: finData } = await window.supabaseClient.from('doacoes_financeiras').select('valor');
-            const totalFin = finData ? finData.reduce((acc, r) => acc + parseFloat(r.valor || 0), 0) : 0;
+            const totalFin = finData ? finData.reduce((acc, r) => {
+                const val = window.sanitizarValorMonetario ? window.sanitizarValorMonetario(r.valor) : (parseFloat(r.valor) || 0);
+                return acc + val;
+            }, 0) : 0;
 
             const { data: matData } = await window.supabaseClient.from('doacoes_materiais').select('quantidade');
-            const totalMat = matData ? matData.reduce((acc, r) => acc + parseInt(r.quantidade || 0), 0) : 0;
+            const totalMat = matData ? matData.reduce((acc, r) => {
+                const q = parseFloat(r.quantidade);
+                return acc + (isNaN(q) ? 0 : q);
+            }, 0) : 0;
 
             setMetricDoadores(doadoresCount || 0);
             setMetricDoacoes(doacoesCount || 0);
             setMetricFinanceiro(totalFin);
-            setMetricMateriais(totalMat);
+            setMetricMateriais(Math.round(totalMat * 100) / 100);
         } catch (e) {
             console.error("Erro ao carregar métricas admin:", e);
         }
@@ -43,14 +49,18 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
         setLoadingData(true);
         if (onLoadingStart) onLoadingStart();
         try {
-            await carregarMetricas();
-            const { data: dData } = await window.doadoresService.buscarDoadoresTodos();
+            try { await carregarMetricas(); } catch (mErr) { console.warn("Aviso métricas:", mErr); }
+
+            const { data: dData, error: errD } = await window.doadoresService.buscarDoadoresTodos();
+            if (errD) throw errD;
             setDoadoresList(dData || []);
 
-            const { data: doaData } = await window.doacoesService.buscarDoacoesAdmin();
+            const { data: doaData, error: errDoa } = await window.doacoesService.buscarDoacoesAdmin();
+            if (errDoa) throw errDoa;
             setDoacoesList(doaData || []);
         } catch (e) {
             console.error("Erro ao carregar dados admin:", e);
+            mostrarToast('Não foi possível carregar os dados administrativos. Verifique a conexão.', 'error');
         } finally {
             setLoadingData(false);
             if (onLoadingEnd) onLoadingEnd();
@@ -177,9 +187,15 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
 
     const registrosPorPagina = 10;
     const totalPaginasDoacoes = Math.max(1, Math.ceil(doacoesFiltradas.length / registrosPorPagina));
-    const paginaAtualDoacoes = Math.min(paginaDoacoes, totalPaginasDoacoes);
+    const paginaAtualDoacoes = Math.min(Math.max(1, paginaDoacoes), totalPaginasDoacoes);
     const inicioPaginaDoacoes = (paginaAtualDoacoes - 1) * registrosPorPagina;
     const doacoesDaPagina = doacoesFiltradas.slice(inicioPaginaDoacoes, inicioPaginaDoacoes + registrosPorPagina);
+
+    useEffect(() => {
+        if (paginaDoacoes > totalPaginasDoacoes) {
+            setPaginaDoacoes(totalPaginasDoacoes);
+        }
+    }, [totalPaginasDoacoes, paginaDoacoes]);
 
     return (
         <div id="tab-admin" className="tab-content active visible space-y-6">

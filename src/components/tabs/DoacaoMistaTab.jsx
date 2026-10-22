@@ -23,6 +23,8 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
 
     const searchContainerRef = useRef(null);
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     // Fechar dropdown ao clicar fora
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -46,7 +48,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, checkFinanceiro, checkMaterial, dropdownOpen]);
+    }, [isVisible, checkFinanceiro, checkMaterial, dropdownOpen, isSubmitting]);
 
     if (!isVisible) return null;
 
@@ -77,19 +79,23 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
         setMatUnidade('Unidade');
         setMatEstado('Não se aplica');
         setMatDestino('Estoque Geral');
+        setIsSubmitting(false);
     };
 
     const selecionarPreset = (tipo) => {
         const presets = {
-            'bazar': { catId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
-            'alimentos': { catId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
-            'higiene': { catId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
-            'cabelo': { catId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
-            'ortopedicos': { catId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
+            'bazar': { termo: 'bazar', fallbackId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
+            'alimentos': { termo: 'alimento', fallbackId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
+            'higiene': { termo: 'higiene', fallbackId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+            'cabelo': { termo: 'cabelo', fallbackId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+            'ortopedicos': { termo: 'ortop', fallbackId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
         };
         const p = presets[tipo];
         if (!p) return;
-        setMatCategoria(p.catId);
+
+        // Tenta achar categoria correspondente dinamicamente pelo nome
+        const catEncontrada = categorias.find(c => c.nome_categoria && c.nome_categoria.toLowerCase().includes(p.termo));
+        setMatCategoria(catEncontrada ? catEncontrada.id_categoria : p.fallbackId);
         setMatDestino(p.destino);
         setMatUnidade(p.unidade);
         setMatEstado(p.estado);
@@ -99,6 +105,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
 
         if (!checkFinanceiro && !checkMaterial) {
             mostrarToast('Por favor, marque pelo menos uma opção (Financeira ou Material).', 'error');
@@ -110,41 +117,55 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
             return;
         }
 
+        setIsSubmitting(true);
         if (onLoadingStart) onLoadingStart();
 
         let idDoacaoGerado = null;
         try {
             const dadosDoacao = {
-                id_doador: parseInt(idDoador),
+                id_doador: parseInt(idDoador, 10),
                 canal_recebimento: canal,
-                observacoes: observacoes || null
+                observacoes: observacoes ? observacoes.trim() : null
             };
 
             const { data: doacaoCriada, error: errorPai } = await window.doacoesService.criarEventoDoacao(dadosDoacao);
             if (errorPai) throw errorPai;
 
             if (!doacaoCriada || doacaoCriada.length === 0) {
-                throw new Error('Erro ao obter o ID da doação criada.');
+                throw new Error('Erro ao obter o ID da doação criada no servidor.');
             }
 
             idDoacaoGerado = doacaoCriada[0].id_doacao;
 
             if (checkFinanceiro) {
+                const valorLimpo = window.sanitizarValorMonetario
+                    ? window.sanitizarValorMonetario(finValor)
+                    : (parseFloat(String(finValor).replace(',', '.')) || 0);
+
+                if (valorLimpo <= 0) {
+                    throw new Error('Informe um valor financeiro válido maior que zero.');
+                }
+
                 const dadosFin = {
                     id_doacao: idDoacaoGerado,
-                    valor: parseFloat(finValor),
-                    comprovante_transacao: finComprovante || null
+                    valor: valorLimpo,
+                    comprovante_transacao: finComprovante ? finComprovante.trim() : null
                 };
                 const { error: errorFin } = await window.doacoesService.criarDoacaoFinanceira(dadosFin);
                 if (errorFin) throw errorFin;
             }
 
             if (checkMaterial) {
+                const qtdLimpa = parseFloat(matQtd);
+                if (isNaN(qtdLimpa) || qtdLimpa <= 0) {
+                    throw new Error('Informe uma quantidade de material válida maior que zero.');
+                }
+
                 const dadosMat = {
                     id_doacao: idDoacaoGerado,
-                    id_categoria: parseInt(matCategoria),
-                    descricao_item: matDescricao,
-                    quantidade: parseInt(matQtd),
+                    id_categoria: parseInt(matCategoria, 10),
+                    descricao_item: matDescricao ? matDescricao.trim() : 'Item sem descrição',
+                    quantidade: Math.round(qtdLimpa * 100) / 100,
                     unidade_medida: matUnidade,
                     estado_conservacao: matEstado,
                     destino_item: matDestino
@@ -153,7 +174,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                 if (errorMat) throw errorMat;
             }
 
-            mostrarToast('Doação registrada com sucesso no Supabase!', 'success');
+            mostrarToast('Doação registrada com sucesso no sistema!', 'success');
             resetForm();
             if (onDoacaoRegistrada) onDoacaoRegistrada();
         } catch (err) {
@@ -163,6 +184,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
             }
             mostrarToast('Erro ao criar evento de doação: ' + err.message, 'error');
         } finally {
+            setIsSubmitting(false);
             if (onLoadingEnd) onLoadingEnd();
         }
     };
@@ -429,9 +451,13 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                 <div className="pt-4 flex justify-end">
                     <button
                         type="submit"
-                        className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition duration-150 cursor-pointer flex items-center gap-2"
+                        disabled={isSubmitting}
+                        className={`bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md transition duration-150 flex items-center gap-2 ${
+                            isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-rose-700 cursor-pointer'
+                        }`}
                     >
-                        <i data-lucide="check-circle" className="w-5 h-5"></i> Registrar Doação Completa
+                        <i data-lucide={isSubmitting ? "loader-2" : "check-circle"} className={`w-5 h-5 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                        <span>{isSubmitting ? 'Registrando...' : 'Registrar Doação Completa'}</span>
                     </button>
                 </div>
             </form>

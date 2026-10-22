@@ -30,11 +30,18 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
 
     const carregarDadosApp = async () => {
         try {
-            const { data: dData } = await window.doadoresService.buscarDoadores();
-            setDoadoresGlobal(dData || []);
-            const { data: cData } = await window.doacoesService.buscarCategoriasItens();
-            setCategoriasGlobal(cData || []);
-        } catch (e) { console.error(e); }
+            const [resDoadores, resCategorias] = await Promise.all([
+                window.doadoresService.buscarDoadores(),
+                window.doacoesService.buscarCategoriasItens()
+            ]);
+            if (resDoadores.error) throw resDoadores.error;
+            if (resCategorias.error) throw resCategorias.error;
+            setDoadoresGlobal(resDoadores.data || []);
+            setCategoriasGlobal(resCategorias.data || []);
+        } catch (e) {
+            console.error("Erro ao sincronizar dados da aplicação:", e);
+            mostrarToast('Erro ao sincronizar dados. Verifique sua conexão com o servidor.', 'error');
+        }
     };
 
     useEffect(() => { carregarDadosApp(); }, []);
@@ -47,36 +54,57 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
             mostrarToast('Doador atualizado com sucesso!', 'success');
             setEditDoadorModalOpen(false);
             carregarDadosApp();
-        } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
+        } catch (e) { mostrarToast('Erro ao atualizar doador: ' + e.message, 'error'); }
         finally { if (onLoadingEnd) onLoadingEnd(); }
     };
 
     const handleSaveDoacao = async (payload) => {
         if (onLoadingStart) onLoadingStart();
         try {
-            await window.doacoesService.atualizarDoacaoCompleta(payload.idDoacao, { id_doador: payload.idDoador, canal_recebimento: payload.canal, observacoes: payload.observacoes || null }, { id_doacao: payload.idDoacao, valor: payload.finValor, comprovante_transacao: payload.finComprovante || null }, { id_doacao: payload.idDoacao, id_categoria: payload.matCategoria, descricao_item: payload.matDescricao, quantidade: payload.matQtd, unidade_medida: payload.matUnidade, estado_conservacao: payload.matEstado, destino_item: payload.matDestino }, payload.checkFinanceiro, payload.checkMaterial, selectedDoacao);
+            await window.doacoesService.atualizarDoacaoCompleta(
+                payload.idDoacao,
+                { id_doador: payload.idDoador, canal_recebimento: payload.canal, observacoes: payload.observacoes || null },
+                { id_doacao: payload.idDoacao, valor: payload.finValor, comprovante_transacao: payload.finComprovante || null },
+                { id_doacao: payload.idDoacao, id_categoria: payload.matCategoria, descricao_item: payload.matDescricao, quantidade: payload.matQtd, unidade_medida: payload.matUnidade, estado_conservacao: payload.matEstado, destino_item: payload.matDestino },
+                payload.checkFinanceiro,
+                payload.checkMaterial,
+                selectedDoacao
+            );
             mostrarToast('Doação atualizada com sucesso!', 'success');
             setEditDoacaoModalOpen(false);
             carregarDadosApp();
-        } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
+        } catch (e) { mostrarToast('Erro ao atualizar doação: ' + e.message, 'error'); }
         finally { if (onLoadingEnd) onLoadingEnd(); }
     };
 
     const handleSaveEstoque = async (payload) => {
         if (onLoadingStart) onLoadingStart();
         try {
-            const novosDados = { descricao_item: payload.novaDesc, id_categoria: payload.novaCat, unidade_medida: payload.novaUnidade, estado_conservacao: payload.novoEstado, destino_item: payload.novoDestino };
+            const novaQtd = parseFloat(payload.novaQtd);
+            if (isNaN(novaQtd) || novaQtd < 0) {
+                throw new Error('Quantidade inválida para o item de estoque.');
+            }
+
+            const novosDados = {
+                descricao_item: payload.novaDesc,
+                id_categoria: payload.novaCat,
+                unidade_medida: payload.novaUnidade,
+                estado_conservacao: payload.novoEstado,
+                destino_item: payload.novoDestino
+            };
+
             if (payload.modo === 'consolidado') {
                 if (!selectedEstoqueItem || !selectedEstoqueItem.lotes) throw new Error('Dados dos lotes não encontrados.');
-                const diferenca = payload.novaQtd - selectedEstoqueItem.quantidadeTotal;
+                const qtdTotalAtual = parseFloat(selectedEstoqueItem.quantidadeTotal) || 0;
+                const diferenca = Math.round((novaQtd - qtdTotalAtual) * 100) / 100;
                 await window.estoqueService.atualizarEstoqueConsolidado(selectedEstoqueItem.lotes, diferenca, novosDados);
             } else {
-                await window.estoqueService.atualizarItemEstoqueLote(payload.idMaterial, { ...novosDados, quantidade: payload.novaQtd });
+                await window.estoqueService.atualizarItemEstoqueLote(payload.idMaterial, { ...novosDados, quantidade: novaQtd });
             }
             mostrarToast('Estoque atualizado com sucesso!', 'success');
             setEditEstoqueModalOpen(false);
             carregarDadosApp();
-        } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
+        } catch (e) { mostrarToast('Erro ao atualizar estoque: ' + e.message, 'error'); }
         finally { if (onLoadingEnd) onLoadingEnd(); }
     };
 

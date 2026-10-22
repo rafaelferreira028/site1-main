@@ -31,13 +31,14 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const qtdNum = parseFloat(quantidade);
         onSave({
-            idMaterial: parseInt(idMaterial),
+            idMaterial: idMaterial ? parseInt(idMaterial, 10) : null,
             modo,
             grupoKey,
-            novaDesc: descricao,
-            novaCat: parseInt(categoria),
-            novaQtd: parseInt(quantidade),
+            novaDesc: descricao ? descricao.trim() : '',
+            novaCat: categoria ? parseInt(categoria, 10) : null,
+            novaQtd: isNaN(qtdNum) || qtdNum < 0 ? 0 : Math.round(qtdNum * 100) / 100,
             novaUnidade: unidade,
             novoEstado: estado,
             novoDestino: destino

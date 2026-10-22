@@ -87,18 +87,40 @@
             }
         }
 
+        function sanitizarValorMonetario(val) {
+            if (val === null || val === undefined || val === '') return 0;
+            if (typeof val === 'number') return isNaN(val) ? 0 : val;
+
+            let str = String(val).trim();
+            if (str.includes(',') && str.includes('.')) {
+                str = str.replace(/\./g, '').replace(',', '.');
+            } else if (str.includes(',')) {
+                str = str.replace(',', '.');
+            }
+
+            const num = parseFloat(str);
+            return isNaN(num) || num < 0 ? 0 : Number(num.toFixed(2));
+        }
+
+        function parseDataSeguraBR(dataIso) {
+            if (!dataIso) return '-';
+            const partes = String(dataIso).split('T')[0].split('-');
+            if (partes.length === 3) {
+                const ano = partes[0].slice(0, 4);
+                const mes = partes[1].padStart(2, '0');
+                const dia = partes[2].padStart(2, '0');
+                return `${dia}/${mes}/${ano}`;
+            }
+            return String(dataIso);
+        }
+
         function formatarMoeda(valor) {
-            const num = parseFloat(valor || 0);
+            const num = sanitizarValorMonetario(valor);
             return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         function formatarDataBR(dataIso) {
-            if (!dataIso) return '-';
-            const partes = dataIso.split('-');
-            if (partes.length === 3) {
-                return `${partes[2].padStart(2, '0')}/${partes[1].padStart(2, '0')}/${partes[0].slice(0, 4)}`;
-            }
-            return dataIso;
+            return parseDataSeguraBR(dataIso);
         }
 
         function formatarCEP(val) {
@@ -372,11 +394,22 @@
             },
             atualizarEstoqueConsolidado: async (lotes, diferenca, novosDados) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                if (!Array.isArray(lotes) || lotes.length === 0) throw new Error("Nenhum lote válido fornecido para atualização.");
                 await exigirAutenticacao();
-                let diferencaRestante = diferenca;
-                const updatePromises = lotes.map((lote) => {
-                    const quantidadeAtual = Number(lote.quantidade) || 0;
+
+                const diferencaNum = Number(diferenca) || 0;
+                const somaAtual = lotes.reduce((acc, l) => acc + (parseFloat(l.quantidade) || 0), 0);
+
+                if (somaAtual + diferencaNum < 0) {
+                    throw new Error(`Operação inválida: a redução (${Math.abs(diferencaNum)}) é maior que o saldo em estoque (${somaAtual}).`);
+                }
+
+                let diferencaRestante = diferencaNum;
+
+                for (const lote of lotes) {
+                    const quantidadeAtual = parseFloat(lote.quantidade) || 0;
                     let qtdLote = quantidadeAtual;
+
                     if (diferencaRestante > 0) {
                         qtdLote += diferencaRestante;
                         diferencaRestante = 0;
@@ -385,14 +418,34 @@
                         qtdLote -= reducao;
                         diferencaRestante += reducao;
                     }
-                    if (qtdLote === 0) {
-                        return supabaseClient.from('doacoes_materiais').delete().eq('id_material', lote.id_material);
+
+                    const payloadAtualizacao = {
+                        quantidade: Math.round(qtdLote * 100) / 100
+                    };
+
+                    if (novosDados) {
+                        if (novosDados.descricao_item) payloadAtualizacao.descricao_item = novosDados.descricao_item;
+                        if (novosDados.id_categoria) payloadAtualizacao.id_categoria = Number(novosDados.id_categoria);
+                        if (novosDados.unidade_medida) payloadAtualizacao.unidade_medida = novosDados.unidade_medida;
+                        if (novosDados.estado_conservacao) payloadAtualizacao.estado_conservacao = novosDados.estado_conservacao;
+                        if (novosDados.destino_item) payloadAtualizacao.destino_item = novosDados.destino_item;
                     }
-                    return supabaseClient.from('doacoes_materiais').update({ quantidade: qtdLote }).eq('id_material', lote.id_material);
-                });
-                const resultados = await Promise.all(updatePromises);
-                const falha = resultados.find(resultado => resultado.error);
-                if (falha) throw falha.error;
+
+                    if (qtdLote <= 0) {
+                        const { error: delErr } = await supabaseClient
+                            .from('doacoes_materiais')
+                            .delete()
+                            .eq('id_material', lote.id_material);
+                        if (delErr) throw new Error(`Falha ao remover item zerado do estoque: ${delErr.message}`);
+                    } else {
+                        const { error: updErr } = await supabaseClient
+                            .from('doacoes_materiais')
+                            .update(payloadAtualizacao)
+                            .eq('id_material', lote.id_material);
+                        if (updErr) throw new Error(`Falha ao atualizar lote #${lote.id_material}: ${updErr.message}`);
+                    }
+                }
+
                 return true;
             }
         };
@@ -423,10 +476,15 @@
                 doc.setFontSize(9);
                 doc.text(`Gerado em: ${dataFormatada} às ${horaFormatada}`, 283, 15, { align: 'right' });
 
-                const totalItens = materiais.reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-                const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-                const totalAlimentos = materiais.filter(m => m.id_categoria === 2).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
-                const totalHigiene = materiais.filter(m => m.id_categoria === 3).reduce((acc, m) => acc + parseInt(m.quantidade || 0), 0);
+                const parseQtdPdf = (val) => {
+                    const n = parseFloat(val);
+                    return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+                };
+
+                const totalItens = materiais.reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
+                const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar') || m.destino_item?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
+                const totalAlimentos = materiais.filter(m => m.id_categoria === 2 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('alimento')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
+                const totalHigiene = materiais.filter(m => m.id_categoria === 3 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('higiene')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
 
                 doc.setFillColor(248, 250, 252);
                 doc.setDrawColor(226, 232, 240);
@@ -449,11 +507,11 @@
                         grupos[key] = {
                             categoria,
                             quantidade: 0,
-                            unidade: 'Itens',
+                            unidade: item.unidade_medida || 'Itens',
                             destino: item.destino_item || 'Estoque Geral'
                         };
                     }
-                    grupos[key].quantidade += parseInt(item.quantidade || 0);
+                    grupos[key].quantidade += parseQtdPdf(item.quantidade);
                 });
 
                 const tableRows = Object.values(grupos).map((g, index) => [
@@ -508,11 +566,29 @@
                 doc.setFontSize(9);
                 doc.text(`Gerado em: ${dataFormatada} às ${horaFormatada}`, 283, 15, { align: 'right' });
 
-                let totalFin = 0; let totalMatQtd = 0; const doadoresSet = new Set();
+                let totalFin = 0;
+                let totalMatQtd = 0;
+                const doadoresSet = new Set();
+
+                const parseQtdMatPdf = (val) => {
+                    const n = parseFloat(val);
+                    return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+                };
+
                 doacoes.forEach(d => {
-                    if (d.doadores && d.doadores.nome) doadoresSet.add(d.doadores.nome);
-                    if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => { totalFin += parseFloat(f.valor || 0); });
-                    if (d.doacoes_materiais) d.doacoes_materiais.forEach(m => { totalMatQtd += parseInt(m.quantidade || 0); });
+                    const idDoador = d.id_doador || (d.doadores && d.doadores.nome);
+                    if (idDoador) doadoresSet.add(idDoador);
+
+                    if (d.doacoes_financeiras) {
+                        d.doacoes_financeiras.forEach(f => {
+                            totalFin += sanitizarValorMonetario(f.valor);
+                        });
+                    }
+                    if (d.doacoes_materiais) {
+                        d.doacoes_materiais.forEach(m => {
+                            totalMatQtd += parseQtdMatPdf(m.quantidade);
+                        });
+                    }
                 });
 
                 doc.setFillColor(248, 250, 252);
@@ -524,14 +600,23 @@
                 doc.text(`TOTAL DOAÇÕES: ${doacoes.length}`, 20, 36.5);
                 doc.text(`DOADORES ÚNICOS: ${doadoresSet.size}`, 85, 36.5);
                 doc.text(`TOTAL FINANCEIRO: R$ ${totalFin.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 150, 36.5);
-                doc.text(`TOTAL MATERIAIS: ${totalMatQtd} itens`, 230, 36.5);
+                doc.text(`TOTAL MATERIAIS: ${Math.round(totalMatQtd * 100) / 100} itens`, 230, 36.5);
 
                 const tableRows = doacoes.map((d, index) => {
                     const nomeDoador = d.doadores ? d.doadores.nome : 'Doador Desconhecido';
-                    const dataDoacaoFmt = d.data_doacao ? new Date(d.data_doacao).toLocaleDateString('pt-BR') : '-';
+                    const dataDoacaoFmt = parseDataSeguraBR(d.data_doacao);
                     const detalhesArr = [];
-                    if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => detalhesArr.push(`[Fin] R$ ${parseFloat(f.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${f.comprovante_transacao ? ` (Nº ${f.comprovante_transacao})` : ''}`));
-                    if (d.doacoes_materiais) d.doacoes_materiais.forEach(m => detalhesArr.push(`[Mat] ${m.descricao_item} - ${m.quantidade} ${m.unidade_medida} (${m.destino_item || 'Estoque'})`));
+                    if (d.doacoes_financeiras) {
+                        d.doacoes_financeiras.forEach(f => {
+                            const v = sanitizarValorMonetario(f.valor);
+                            detalhesArr.push(`[Fin] R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${f.comprovante_transacao ? ` (Nº ${f.comprovante_transacao})` : ''}`);
+                        });
+                    }
+                    if (d.doacoes_materiais) {
+                        d.doacoes_materiais.forEach(m => {
+                            detalhesArr.push(`[Mat] ${m.descricao_item} - ${m.quantidade} ${m.unidade_medida} (${m.destino_item || 'Estoque'})`);
+                        });
+                    }
                     return [index + 1, nomeDoador, dataDoacaoFmt, d.canal_recebimento || 'Presencial', detalhesArr.join(' | ') || 'Sem detalhes', d.observacoes || '-'];
                 });
 
@@ -583,7 +668,34 @@
                 }
             };
 
-            useEffect(() => { checkAuth(); }, []);
+            useEffect(() => {
+                let isMounted = true;
+                checkAuth();
+
+                let sub = null;
+                if (supabaseClient && supabaseClient.auth) {
+                    try {
+                        const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, newSession) => {
+                            if (!isMounted) return;
+                            if (event === 'SIGNED_OUT') {
+                                setAuthenticated(false);
+                                setSession(null);
+                            } else if (newSession) {
+                                setSession(newSession);
+                                setAuthenticated(true);
+                            }
+                        });
+                        sub = subscription;
+                    } catch (e) {
+                        console.warn("Aviso onAuthStateChange:", e);
+                    }
+                }
+
+                return () => {
+                    isMounted = false;
+                    if (sub && sub.unsubscribe) sub.unsubscribe();
+                };
+            }, []);
 
             const login = async (email, password) => {
                 if (onLoadingStart) onLoadingStart();
@@ -613,9 +725,20 @@
                 }
             };
 
-            const register = async (nome, email, password) => {
+            const register = async (arg1, arg2, arg3) => {
                 if (onLoadingStart) onLoadingStart();
                 try {
+                    let nome, email, password;
+                    if (typeof arg1 === 'object' && arg1 !== null) {
+                        nome = arg1.nome;
+                        email = arg1.identificador;
+                        password = arg1.senha;
+                    } else {
+                        nome = arg1;
+                        email = arg2;
+                        password = arg3;
+                    }
+
                     const { data, error } = await authService.criarLoginSupabase(nome, email, password);
                     if (error) throw error;
                     if (data && data.session) {
@@ -640,17 +763,33 @@
         function useAuth() { return useContext(AuthContext); }
 
         const ThemeContext = createContext();
+        const TEMAS_VALIDOS_INDEX = ['light', 'dark', 'ultra-dark'];
+
+        function getTemaInicialIndex() {
+            try {
+                const s = localStorage.getItem('site-theme');
+                return TEMAS_VALIDOS_INDEX.includes(s) ? s : 'light';
+            } catch (_) {
+                return 'light';
+            }
+        }
+
         function ThemeProvider({ children, onShowToast }) {
-            const [theme, setThemeState] = useState(() => localStorage.getItem('site-theme') || 'light');
+            const [theme, setThemeState] = useState(getTemaInicialIndex);
             const [menuOpen, setMenuOpen] = useState(false);
 
             const applyTheme = (newTheme) => {
-                setThemeState(newTheme);
-                localStorage.setItem('site-theme', newTheme);
+                const temaFinal = TEMAS_VALIDOS_INDEX.includes(newTheme) ? newTheme : 'light';
+                setThemeState(temaFinal);
+                try {
+                    localStorage.setItem('site-theme', temaFinal);
+                } catch (e) {
+                    console.warn("Storage tema:", e);
+                }
                 document.body.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
                 document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
-                document.body.classList.add('theme-' + newTheme);
-                document.documentElement.classList.add('theme-' + newTheme);
+                document.body.classList.add('theme-' + temaFinal);
+                document.documentElement.classList.add('theme-' + temaFinal);
             };
 
             useEffect(() => { applyTheme(theme); }, []);
@@ -666,16 +805,17 @@
             };
 
             const toggleMenu = (e) => {
-                if (e) e.stopPropagation();
+                if (e && e.stopPropagation) e.stopPropagation();
                 setMenuOpen(prev => !prev);
             };
 
             useEffect(() => {
                 const handleOutsideClick = (e) => {
+                    if (!(e.target instanceof Element)) return;
                     if (!e.target.closest('.theme-selector-container')) setMenuOpen(false);
                 };
-                document.addEventListener('click', handleOutsideClick);
-                return () => document.removeEventListener('click', handleOutsideClick);
+                document.addEventListener('mousedown', handleOutsideClick);
+                return () => document.removeEventListener('mousedown', handleOutsideClick);
             }, []);
 
             return (

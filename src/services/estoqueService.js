@@ -56,11 +56,22 @@ async function atualizarItemEstoqueLote(idMaterial, dadosItem) {
 
 async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    if (!Array.isArray(lotes) || lotes.length === 0) throw new Error("Nenhum lote válido fornecido para atualização.");
     await exigirAutenticacao();
-    let diferencaRestante = diferenca;
-    const updatePromises = lotes.map((lote) => {
-        const quantidadeAtual = Number(lote.quantidade) || 0;
+
+    const diferencaNum = Number(diferenca) || 0;
+    const somaAtual = lotes.reduce((acc, l) => acc + (parseFloat(l.quantidade) || 0), 0);
+
+    if (somaAtual + diferencaNum < 0) {
+        throw new Error(`Operação inválida: a redução (${Math.abs(diferencaNum)}) é maior que o saldo em estoque (${somaAtual}).`);
+    }
+
+    let diferencaRestante = diferencaNum;
+
+    for (const lote of lotes) {
+        const quantidadeAtual = parseFloat(lote.quantidade) || 0;
         let qtdLote = quantidadeAtual;
+
         if (diferencaRestante > 0) {
             qtdLote += diferencaRestante;
             diferencaRestante = 0;
@@ -69,23 +80,34 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
             qtdLote -= reducao;
             diferencaRestante += reducao;
         }
-        if (qtdLote === 0) {
-            return window.supabaseClient
+
+        const payloadAtualizacao = {
+            quantidade: Math.round(qtdLote * 100) / 100
+        };
+
+        if (novosDados) {
+            if (novosDados.descricao_item) payloadAtualizacao.descricao_item = novosDados.descricao_item;
+            if (novosDados.id_categoria) payloadAtualizacao.id_categoria = Number(novosDados.id_categoria);
+            if (novosDados.unidade_medida) payloadAtualizacao.unidade_medida = novosDados.unidade_medida;
+            if (novosDados.estado_conservacao) payloadAtualizacao.estado_conservacao = novosDados.estado_conservacao;
+            if (novosDados.destino_item) payloadAtualizacao.destino_item = novosDados.destino_item;
+        }
+
+        if (qtdLote <= 0) {
+            const { error: delErr } = await window.supabaseClient
                 .from('doacoes_materiais')
                 .delete()
                 .eq('id_material', lote.id_material);
+            if (delErr) throw new Error(`Falha ao remover item zerado do estoque: ${delErr.message}`);
+        } else {
+            const { error: updErr } = await window.supabaseClient
+                .from('doacoes_materiais')
+                .update(payloadAtualizacao)
+                .eq('id_material', lote.id_material);
+            if (updErr) throw new Error(`Falha ao atualizar lote #${lote.id_material}: ${updErr.message}`);
         }
-        return window.supabaseClient
-            .from('doacoes_materiais')
-            .update({
-                quantidade: qtdLote
-            })
-            .eq('id_material', lote.id_material);
-    });
+    }
 
-    const results = await Promise.all(updatePromises);
-    const failure = results.find(r => r.error);
-    if (failure) throw failure.error;
     return true;
 }
 

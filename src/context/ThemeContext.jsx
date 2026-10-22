@@ -2,19 +2,36 @@ const { createContext, useContext, useState, useEffect } = React;
 
 const ThemeContext = createContext();
 
+const TEMAS_VALIDOS = ['light', 'dark', 'ultra-dark'];
+
+function getTemaInicial() {
+    try {
+        const salvo = localStorage.getItem('site-theme');
+        return TEMAS_VALIDOS.includes(salvo) ? salvo : 'light';
+    } catch (_) {
+        return 'light';
+    }
+}
+
 function ThemeProvider({ children, onShowToast }) {
-    const [theme, setThemeState] = useState(() => localStorage.getItem('site-theme') || 'light');
+    const [theme, setThemeState] = useState(getTemaInicial);
     const [menuOpen, setMenuOpen] = useState(false);
 
     const applyTheme = (newTheme) => {
-        setThemeState(newTheme);
-        localStorage.setItem('site-theme', newTheme);
+        const temaFinal = TEMAS_VALIDOS.includes(newTheme) ? newTheme : 'light';
+        setThemeState(temaFinal);
+
+        try {
+            localStorage.setItem('site-theme', temaFinal);
+        } catch (e) {
+            console.warn("Não foi possível salvar o tema no localStorage:", e);
+        }
 
         document.body.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
         document.documentElement.classList.remove('theme-light', 'theme-dark', 'theme-ultra-dark');
 
-        document.body.classList.add('theme-' + newTheme);
-        document.documentElement.classList.add('theme-' + newTheme);
+        document.body.classList.add('theme-' + temaFinal);
+        document.documentElement.classList.add('theme-' + temaFinal);
     };
 
     useEffect(() => {
@@ -36,7 +53,7 @@ function ThemeProvider({ children, onShowToast }) {
     };
 
     const toggleMenu = (e) => {
-        if (e) e.stopPropagation();
+        if (e && e.stopPropagation) e.stopPropagation();
         setMenuOpen(prev => !prev);
     };
 
@@ -46,12 +63,13 @@ function ThemeProvider({ children, onShowToast }) {
 
     useEffect(() => {
         const handleOutsideClick = (e) => {
+            if (!(e.target instanceof Element)) return;
             if (!e.target.closest('.theme-selector-container')) {
                 closeMenu();
             }
         };
-        document.addEventListener('click', handleOutsideClick);
-        return () => document.removeEventListener('click', handleOutsideClick);
+        document.addEventListener('mousedown', handleOutsideClick);
+        return () => document.removeEventListener('mousedown', handleOutsideClick);
     }, []);
 
     return (

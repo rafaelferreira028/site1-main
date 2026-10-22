@@ -49,21 +49,41 @@ function formatarTelefone(val) {
     }
 }
 
-function formatarMoeda(valor) {
-    const num = parseFloat(valor || 0);
-    return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function sanitizarValorMonetario(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+
+    let str = String(val).trim();
+    // Remove pontuação de milhar se houver vírgula como separador decimal
+    if (str.includes(',') && str.includes('.')) {
+        str = str.replace(/\./g, '').replace(',', '.');
+    } else if (str.includes(',')) {
+        str = str.replace(',', '.');
+    }
+
+    const num = parseFloat(str);
+    return isNaN(num) || num < 0 ? 0 : Number(num.toFixed(2));
 }
 
-function formatarDataBR(dataIso) {
+function parseDataSeguraBR(dataIso) {
     if (!dataIso) return '-';
-    const partes = dataIso.split('-');
+    const partes = String(dataIso).split('T')[0].split('-');
     if (partes.length === 3) {
         const ano = partes[0].slice(0, 4);
         const mes = partes[1].padStart(2, '0');
         const dia = partes[2].padStart(2, '0');
         return `${dia}/${mes}/${ano}`;
     }
-    return dataIso;
+    return String(dataIso);
+}
+
+function formatarMoeda(valor) {
+    const num = sanitizarValorMonetario(valor);
+    return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatarDataBR(dataIso) {
+    return parseDataSeguraBR(dataIso);
 }
 
 function limitarAnoDataInput(input) {
@@ -148,6 +168,8 @@ window.formatarCNPJ = formatarCNPJ;
 window.formatarDocumento = formatarDocumento;
 window.formatarTelefone = formatarTelefone;
 window.formatarMoeda = formatarMoeda;
+window.sanitizarValorMonetario = sanitizarValorMonetario;
+window.parseDataSeguraBR = parseDataSeguraBR;
 window.formatarDataBR = formatarDataBR;
 window.limitarAnoDataInput = limitarAnoDataInput;
 window.formatarCEP = formatarCEP;

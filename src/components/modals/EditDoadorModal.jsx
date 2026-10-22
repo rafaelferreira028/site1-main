@@ -47,20 +47,24 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
         const cepDigitos = valor.replace(/\D/g, '');
         if (cepDigitos.length === 8) {
             setIsBuscaCepLoading(true);
-            const fnConsulta = window.consultarCEP || (typeof consultarCEP !== 'undefined' ? consultarCEP : null);
-            if (fnConsulta) {
-                const res = await fnConsulta(cepDigitos);
-                setIsBuscaCepLoading(false);
-                if (res) {
-                    if (res.error) {
-                        mostrarToast(res.error, 'warning');
-                    } else {
-                        if (res.cidadeUf) setCidade(res.cidadeUf);
-                        if (res.endereco) setEndereco(res.endereco);
-                        mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+            try {
+                const fnConsulta = window.consultarCEP || (typeof consultarCEP !== 'undefined' ? consultarCEP : null);
+                if (fnConsulta) {
+                    const res = await fnConsulta(cepDigitos);
+                    if (res) {
+                        if (res.error) {
+                            mostrarToast(res.error, 'warning');
+                        } else {
+                            if (res.cidadeUf) setCidade(res.cidadeUf);
+                            if (res.endereco) setEndereco(res.endereco);
+                            mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+                        }
                     }
                 }
-            } else {
+            } catch (err) {
+                console.error("Erro na busca de CEP:", err);
+                mostrarToast('Não foi possível autocompletar o CEP.', 'warning');
+            } finally {
                 setIsBuscaCepLoading(false);
             }
         }
@@ -68,16 +72,22 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const nomeLimpo = nome ? nome.trim() : '';
+        if (!nomeLimpo) {
+            mostrarToast('Por favor, informe o nome ou razão social.', 'error');
+            return;
+        }
+
         onSave({
-            id_doador: parseInt(idDoador),
-            nome,
+            id_doador: parseInt(idDoador, 10),
+            nome: nomeLimpo,
             tipo_doador: tipoDoador,
-            documento: documento || null,
-            telefone: telefone || null,
-            email: email || null,
-            cep: cep || null,
-            endereco: endereco || null,
-            cidade: cidade || null,
+            documento: documento ? documento.trim() : null,
+            telefone: telefone ? telefone.trim() : null,
+            email: email ? email.trim() : null,
+            cep: cep ? cep.trim() : null,
+            endereco: endereco ? endereco.trim() : null,
+            cidade: cidade ? cidade.trim() : null,
             data_nascimento: dataNascimento || null
         });
     };

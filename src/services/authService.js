@@ -202,27 +202,37 @@ async function realizarLoginFlexivel(identificadorOuEmail, password) {
 
 async function verificarSessaoSupabase() {
     // 1. Verifica sessão no Supabase
-    if (window.supabaseClient) {
+    if (window.supabaseClient && window.supabaseClient.auth) {
         try {
-            const { data: { session } } = await window.supabaseClient.auth.getSession();
-            if (session) return { session, user: session.user };
+            const { data: { session }, error } = await window.supabaseClient.auth.getSession();
+            if (!error && session && session.user) {
+                return { session, user: session.user };
+            }
         } catch (e) {
-            console.error("Erro sessão Supabase:", e);
+            console.warn("Aviso ao conectar com Supabase Auth:", e);
         }
     }
-    // 2. Verifica sessão local persistida (com validação de expiração TTL)
+
+    // 2. Verifica sessão local persistida (com validação estrita de schema e expiração TTL)
     try {
         const raw = localStorage.getItem(STORAGE_SESSION_KEY);
-        if (raw) {
-            const sessao = JSON.parse(raw);
-            if (sessao.expiresAt && Date.now() > sessao.expiresAt) {
-                // Sessão expirada: limpar
-                localStorage.removeItem(STORAGE_SESSION_KEY);
-                return { session: null, user: null };
-            }
-            return { session: sessao, user: sessao.user };
+        if (!raw) return { session: null, user: null };
+
+        const sessao = JSON.parse(raw);
+        const isSessaoValida = sessao &&
+            typeof sessao === 'object' &&
+            sessao.user &&
+            typeof sessao.user === 'object' &&
+            typeof sessao.expiresAt === 'number';
+
+        if (!isSessaoValida || Date.now() > sessao.expiresAt) {
+            localStorage.removeItem(STORAGE_SESSION_KEY);
+            return { session: null, user: null };
         }
+
+        return { session: sessao, user: sessao.user };
     } catch (e) {
+        console.error("Payload corrompido de sessão local, limpando:", e);
         try { localStorage.removeItem(STORAGE_SESSION_KEY); } catch (_) {}
     }
 
@@ -232,11 +242,15 @@ async function verificarSessaoSupabase() {
 async function realizarLogoutSupabase() {
     try {
         localStorage.removeItem(STORAGE_SESSION_KEY);
-    } catch (e) {}
-    if (window.supabaseClient) {
+    } catch (e) {
+        console.error("Erro ao remover chave de sessão local:", e);
+    }
+    if (window.supabaseClient && window.supabaseClient.auth) {
         try {
             await window.supabaseClient.auth.signOut();
-        } catch (e) {}
+        } catch (e) {
+            console.warn("Aviso ao efetuar signOut no Supabase:", e);
+        }
     }
     return { success: true };
 }

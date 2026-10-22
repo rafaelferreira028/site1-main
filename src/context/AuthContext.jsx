@@ -22,7 +22,36 @@ function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
     };
 
     useEffect(() => {
+        let isMounted = true;
         checkAuth();
+
+        let authSubscription = null;
+        if (window.supabaseClient && window.supabaseClient.auth) {
+            try {
+                const { data: { subscription } } = window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
+                    if (!isMounted) return;
+                    if (event === 'SIGNED_OUT') {
+                        setAuthenticated(false);
+                        setSession(null);
+                        setCurrentUser(null);
+                    } else if (newSession) {
+                        setSession(newSession);
+                        setCurrentUser(newSession.user);
+                        setAuthenticated(true);
+                    }
+                });
+                authSubscription = subscription;
+            } catch (e) {
+                console.warn("Aviso ao subscrever onAuthStateChange:", e);
+            }
+        }
+
+        return () => {
+            isMounted = false;
+            if (authSubscription && authSubscription.unsubscribe) {
+                authSubscription.unsubscribe();
+            }
+        };
     }, []);
 
     const login = async (identifier, password) => {
@@ -41,13 +70,21 @@ function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
         }
     };
 
-    const register = async ({ identificador, senha, nome, tipo }) => {
+    const register = async (arg1, arg2, arg3) => {
         if (onLoadingStart) onLoadingStart();
         try {
-            const res = await window.authService.cadastrarNovoUsuario({ identificador, senha, nome, tipo });
+            // Suporte flexível a formato objeto { identificador, senha, nome, tipo } ou posicional (nome, email, senha)
+            let payload;
+            if (typeof arg1 === 'object' && arg1 !== null) {
+                payload = arg1;
+            } else {
+                payload = { nome: arg1, identificador: arg2, senha: arg3, tipo: 'email' };
+            }
+
+            const res = await window.authService.cadastrarNovoUsuario(payload);
             if (!res || !res.success) throw new Error("Falha ao registrar usuário.");
             // Login imediato após o cadastro
-            const loginRes = await login(identificador, senha);
+            const loginRes = await login(payload.identificador, payload.senha);
             if (!loginRes.success) throw loginRes.error;
             return { success: true, usuario: res.usuario };
         } catch (error) {
