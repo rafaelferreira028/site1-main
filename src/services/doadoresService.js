@@ -1,3 +1,13 @@
+async function exigirAutenticacao() {
+    if (window.authService && window.authService.verificarSessaoSupabase) {
+        const { session } = await window.authService.verificarSessaoSupabase();
+        if (!session) {
+            throw new Error("Acesso negado: Sessão inválida ou expirada. Faça login novamente.");
+        }
+        return session;
+    }
+}
+
 async function buscarDoadores() {
     if (!window.supabaseClient) return { data: [], error: null };
     return await window.supabaseClient
@@ -13,11 +23,13 @@ async function buscarDoadoresTodos() {
 
 async function criarDoador(dadosDoador) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     return await window.supabaseClient.from('doadores').insert([dadosDoador]).select();
 }
 
 async function atualizarDoador(idDoador, dadosDoador) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     const resultado = await window.supabaseClient.from('doadores').update(dadosDoador).eq('id_doador', idDoador);
     if (resultado.error) throw resultado.error;
     return resultado;
@@ -25,6 +37,7 @@ async function atualizarDoador(idDoador, dadosDoador) {
 
 async function deletarDoadorCascata(idDoador) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     
     // 1. Buscar doações do doador
     const { data: listDoacoes, error: errList } = await window.supabaseClient.from('doacoes').select('id_doacao').eq('id_doador', idDoador);

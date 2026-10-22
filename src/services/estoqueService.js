@@ -1,3 +1,13 @@
+async function exigirAutenticacao() {
+    if (window.authService && window.authService.verificarSessaoSupabase) {
+        const { session } = await window.authService.verificarSessaoSupabase();
+        if (!session) {
+            throw new Error("Acesso negado: Sessão inválida ou expirada. Faça login novamente.");
+        }
+        return session;
+    }
+}
+
 async function buscarEstoqueMateriais() {
     if (!window.supabaseClient) return { data: [], error: null };
     const { data: matData, error } = await window.supabaseClient
@@ -38,6 +48,7 @@ async function buscarEstoqueDoacoesCanais() {
 
 async function atualizarItemEstoqueLote(idMaterial, dadosItem) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     const resultado = await window.supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
     if (resultado.error) throw resultado.error;
     return resultado;
@@ -45,6 +56,7 @@ async function atualizarItemEstoqueLote(idMaterial, dadosItem) {
 
 async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     let diferencaRestante = diferenca;
     const updatePromises = lotes.map((lote) => {
         const quantidadeAtual = Number(lote.quantidade) || 0;

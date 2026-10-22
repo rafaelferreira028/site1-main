@@ -114,6 +114,35 @@ async function consultarCEP(cep) {
     }
 }
 
+// Utilitários de Mascaramento para Proteção de Dados Pessoais (LGPD / AppSec MED-01)
+function mascararDocumento(val, tipo) {
+    if (!val) return "";
+    const clean = val.replace(/\D/g, "");
+    if (tipo === 'PF' || clean.length <= 11) {
+        const cpf = formatarCPF(clean);
+        return cpf.replace(/^(\d{3})\.(\d{3})\.(\d{3})-(\d{2})$/, "$1.***.***-$2");
+    } else {
+        const cnpj = formatarCNPJ(clean);
+        return cnpj.replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})-(\d{2})$/, "$1.***.***/$4-$2");
+    }
+}
+
+function mascararTelefone(val) {
+    if (!val) return "";
+    const tel = formatarTelefone(val);
+    // Mascara o meio do telefone: (11) 98765-4321 -> (11) 9****-4321
+    return tel.replace(/^(\(\d{2}\)\s*\d)(\d{3,4})(-\d{4})$/, (match, p1, p2, p3) => {
+        return `${p1}${'*'.repeat(p2.length)}${p3}`;
+    });
+}
+
+function mascararEmail(email) {
+    if (!email || !email.includes('@')) return email || '';
+    const [user, domain] = email.split('@');
+    if (user.length <= 2) return `${user[0]}*@${domain}`;
+    return `${user.slice(0, 2)}${'*'.repeat(Math.max(2, user.length - 2))}@${domain}`;
+}
+
 window.formatarCPF = formatarCPF;
 window.formatarCNPJ = formatarCNPJ;
 window.formatarDocumento = formatarDocumento;
@@ -123,3 +152,6 @@ window.formatarDataBR = formatarDataBR;
 window.limitarAnoDataInput = limitarAnoDataInput;
 window.formatarCEP = formatarCEP;
 window.consultarCEP = consultarCEP;
+window.mascararDocumento = mascararDocumento;
+window.mascararTelefone = mascararTelefone;
+window.mascararEmail = mascararEmail;

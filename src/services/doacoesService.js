@@ -1,3 +1,13 @@
+async function exigirAutenticacao() {
+    if (window.authService && window.authService.verificarSessaoSupabase) {
+        const { session } = await window.authService.verificarSessaoSupabase();
+        if (!session) {
+            throw new Error("Acesso negado: Sessão inválida ou expirada. Faça login novamente.");
+        }
+        return session;
+    }
+}
+
 async function buscarCategoriasItens() {
     if (!window.supabaseClient) return { data: [], error: null };
     return await window.supabaseClient.from('categorias_itens').select('id_categoria, nome_categoria').order('id_categoria');
@@ -5,16 +15,19 @@ async function buscarCategoriasItens() {
 
 async function criarEventoDoacao(dadosDoacao) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     return await window.supabaseClient.from('doacoes').insert([dadosDoacao]).select();
 }
 
 async function criarDoacaoFinanceira(dadosFin) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     return await window.supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
 }
 
 async function criarDoacaoMaterial(dadosMat) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
     return await window.supabaseClient.from('doacoes_materiais').insert([dadosMat]);
 }
 
@@ -39,6 +52,7 @@ async function buscarDoacoesAdmin() {
 
 async function deletarDoacaoCompleta(idDoacao) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
 
     const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
     if (errFin) throw errFin;
@@ -53,6 +67,7 @@ async function deletarDoacaoCompleta(idDoacao) {
 
 async function atualizarDoacaoCompleta(idDoacao, dadosPai, dadosFin, dadosMat, editHasFin, editHasMat, originalDoacao) {
     if (!window.supabaseClient) throw new Error("Supabase não disponível");
+    await exigirAutenticacao();
 
     const { error: errorPai } = await window.supabaseClient.from('doacoes').update(dadosPai).eq('id_doacao', idDoacao);
     if (errorPai) throw errorPai;

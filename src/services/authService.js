@@ -1,6 +1,44 @@
 // Serviço de Autenticação com suporte a E-mail, ID Personalizado e Supabase Auth
+// Implementação Segura com Hash SHA-256 Salted (Web Crypto API) e TTL de Sessão
 const STORAGE_USERS_KEY = 'rede_usuarios_sistema';
 const STORAGE_SESSION_KEY = 'rede_sessao_ativa';
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 horas
+
+/**
+ * Gera hash SHA-256 com salt criptográfico usando a Web Crypto API nativa
+ */
+async function hashSenha(senha, salt = null) {
+    if (!salt) {
+        const saltBytes = new Uint8Array(16);
+        if (window.crypto && window.crypto.getRandomValues) {
+            window.crypto.getRandomValues(saltBytes);
+        } else {
+            for (let i = 0; i < 16; i++) saltBytes[i] = Math.floor(Math.random() * 256);
+        }
+        salt = Array.from(saltBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    const enc = new TextEncoder();
+    const data = enc.encode(salt + ":" + senha);
+    const hashBuf = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArr = Array.from(new Uint8Array(hashBuf));
+    const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${salt}:${hashHex}`;
+}
+
+/**
+ * Compara a senha informada com o hash armazenado (com retrocompatibilidade para migração automática)
+ */
+async function verificarSenha(senhaDigitada, hashArmazenado) {
+    if (!senhaDigitada || !hashArmazenado) return false;
+    // Suporte a migração automática para senhas legadas em texto plano
+    if (!hashArmazenado.includes(':')) {
+        return hashArmazenado === senhaDigitada;
+    }
+    const [salt, hashOriginal] = hashArmazenado.split(':');
+    const hashGeradoCompleto = await hashSenha(senhaDigitada, salt);
+    const [, hashGerado] = hashGeradoCompleto.split(':');
+    return hashOriginal === hashGerado;
+}
 
 function getUsuariosLocais() {
     try {
@@ -12,13 +50,13 @@ function getUsuariosLocais() {
     } catch (e) {
         console.error("Erro ao ler usuários locais:", e);
     }
-    // Conta administrativa padrão inicial
+    // Conta administrativa padrão inicial protegida com hash salted SHA-256 (senha inicial: 'admin')
     const padrao = [{
         id: 'usr_admin',
         identificador: 'admin',
         nome: 'Administrador',
         tipo: 'id',
-        senha: 'admin',
+        senha: 'a8f5c9e2b1d40376:bfdfdefeddb11aa609173c6a3407dba48bd77ba97c6482db5ab859551bc5c790',
         criadoEm: new Date().toISOString()
     }];
     try {
@@ -39,8 +77,13 @@ async function cadastrarNovoUsuario({ identificador, senha, nome, tipo }) {
     if (!identificador || !identificador.trim()) {
         throw new Error("Por favor, preencha o E-mail ou ID de Acesso desejado.");
     }
-    if (!senha || senha.length < 3) {
-        throw new Error("A senha deve conter no mínimo 3 caracteres.");
+    if (!senha || senha.length < 8) {
+        throw new Error("A senha deve conter no mínimo 8 caracteres.");
+    }
+    const temLetra = /[a-zA-Z]/.test(senha);
+    const temNumero = /\d/.test(senha);
+    if (!temLetra || !temNumero) {
+        throw new Error("A senha deve conter letras e números para maior segurança.");
     }
 
     const idLimpo = identificador.trim();
@@ -57,12 +100,19 @@ async function cadastrarNovoUsuario({ identificador, senha, nome, tipo }) {
         throw new Error(`O ${tipoFinal === 'email' ? 'e-mail' : 'ID'} "${idLimpo}" já está cadastrado. Escolha outro ou faça login.`);
     }
 
+    // Hash criptográfico da senha antes do armazenamento
+    const senhaHash = await hashSenha(senha);
+
+    const novoId = (window.crypto && window.crypto.randomUUID)
+        ? 'usr_' + window.crypto.randomUUID()
+        : 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
     const novo = {
-        id: 'usr_' + Date.now(),
+        id: novoId,
         identificador: idLimpo,
         nome: (nome && nome.trim()) ? nome.trim() : idLimpo,
         tipo: tipoFinal,
-        senha: senha,
+        senha: senhaHash,
         criadoEm: new Date().toISOString()
     };
 
@@ -82,7 +132,9 @@ async function cadastrarNovoUsuario({ identificador, senha, nome, tipo }) {
         }
     }
 
-    return { success: true, usuario: novo };
+    // Não retornar a senha no objeto de resposta
+    const { senha: _, ...usuarioSemSenha } = novo;
+    return { success: true, usuario: usuarioSemSenha };
 }
 
 async function realizarLoginFlexivel(identificadorOuEmail, password) {
@@ -95,7 +147,15 @@ async function realizarLoginFlexivel(identificadorOuEmail, password) {
     const usuarioLocal = usuarios.find(u => u.identificador.toLowerCase() === termo.toLowerCase());
 
     if (usuarioLocal) {
-        if (usuarioLocal.senha === password) {
+        const senhaCorreta = await verificarSenha(password, usuarioLocal.senha);
+        if (senhaCorreta) {
+            // Migração automática transparente: se a senha ainda estiver em texto plano, atualiza para hash
+            if (!usuarioLocal.senha.includes(':')) {
+                usuarioLocal.senha = await hashSenha(password);
+                salvarUsuariosLocais(usuarios);
+            }
+
+            const agora = Date.now();
             const sessaoLocal = {
                 user: {
                     id: usuarioLocal.id,
@@ -103,7 +163,9 @@ async function realizarLoginFlexivel(identificadorOuEmail, password) {
                     identificador: usuarioLocal.identificador,
                     user_metadata: { name: usuarioLocal.nome, tipo: usuarioLocal.tipo }
                 },
-                tipo: 'local'
+                tipo: 'local',
+                criadoEm: agora,
+                expiresAt: agora + SESSION_TTL_MS // Expiração após 8 horas
             };
             try {
                 localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessaoLocal));
@@ -148,14 +210,21 @@ async function verificarSessaoSupabase() {
             console.error("Erro sessão Supabase:", e);
         }
     }
-    // 2. Verifica sessão local persistida
+    // 2. Verifica sessão local persistida (com validação de expiração TTL)
     try {
         const raw = localStorage.getItem(STORAGE_SESSION_KEY);
         if (raw) {
             const sessao = JSON.parse(raw);
+            if (sessao.expiresAt && Date.now() > sessao.expiresAt) {
+                // Sessão expirada: limpar
+                localStorage.removeItem(STORAGE_SESSION_KEY);
+                return { session: null, user: null };
+            }
             return { session: sessao, user: sessao.user };
         }
-    } catch (e) {}
+    } catch (e) {
+        try { localStorage.removeItem(STORAGE_SESSION_KEY); } catch (_) {}
+    }
 
     return { session: null, user: null };
 }
@@ -172,10 +241,10 @@ async function realizarLogoutSupabase() {
     return { success: true };
 }
 
+// Interface pública: getUsuariosLocais REMOVIDO para evitar extração de credenciais (CRIT-04)
 window.authService = {
     verificarSessaoSupabase,
     realizarLoginSupabase: realizarLoginFlexivel,
     realizarLogoutSupabase,
-    cadastrarNovoUsuario,
-    getUsuariosLocais
+    cadastrarNovoUsuario
 };

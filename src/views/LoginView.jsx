@@ -65,8 +65,15 @@ function LoginView() {
             return;
         }
 
-        if (regPassword.length < 3) {
-            setErrorMsg('A senha deve conter no mínimo 3 caracteres.');
+        if (regPassword.length < 8) {
+            setErrorMsg('A senha deve conter no mínimo 8 caracteres.');
+            return;
+        }
+
+        const temLetra = /[a-zA-Z]/.test(regPassword);
+        const temNumero = /\d/.test(regPassword);
+        if (!temLetra || !temNumero) {
+            setErrorMsg('A senha deve conter letras e números para maior segurança.');
             return;
         }
 
@@ -307,8 +314,9 @@ function LoginView() {
                                     type={showRegPassword ? "text" : "password"}
                                     value={regPassword}
                                     onChange={(e) => setRegPassword(e.target.value)}
-                                    placeholder="Digite a senha desejada"
+                                    placeholder="Mínimo 8 caracteres (letras e números)"
                                     required
+                                    minLength="8"
                                     className="w-full px-4 py-2.5 pr-11 rounded-xl border border-gray-200 dark:border-slate-700 text-sm focus:border-rose-500 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white"
                                 />
                                 <button
@@ -320,6 +328,9 @@ function LoginView() {
                                     <i data-lucide={showRegPassword ? "eye-off" : "eye"} className="w-4 h-4"></i>
                                 </button>
                             </div>
+                            <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">
+                                A senha deve conter pelo menos 8 caracteres, com letras e números.
+                            </p>
                         </div>
 
                         {/* Campo Confirmar Senha */}

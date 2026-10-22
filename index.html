@@ -6,20 +6,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rede de Combate ao Câncer - Sistema de Doações e Estoque</title>
 
+    <!-- Meta Tags de Segurança (MED-02, MED-03) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://viacep.com.br; img-src 'self' data: https:; font-src 'self' data:;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()">
+
     <!-- Design System & Estilos Globais -->
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="./styles/main.css">
 
-    <!-- Dependências e SDKs Externos -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Dependências e SDKs Externos com Versões Fixas e Crossorigin -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
 
     <!-- React 18 & Babel Standalone (Compilação em Memória sem CORS local) -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
 
     <script>
         // Execução instantânea para evitar flash branco no carregamento
@@ -39,8 +46,8 @@
         // ==========================================
         // 1. CONFIGURAÇÃO E UTILS
         // ==========================================
-        const SUPABASE_URL = "https://bevvvsghutwpnexuczda.supabase.co";
-        const SUPABASE_ANON_KEY = "sb_publishable_CaMU6q53y-n9p0PXW4F1Ow_bgYrD9Mm";
+        const SUPABASE_URL = (window.__ENV__ && window.__ENV__.SUPABASE_URL) || "https://bevvvsghutwpnexuczda.supabase.co";
+        const SUPABASE_ANON_KEY = (window.__ENV__ && window.__ENV__.SUPABASE_ANON_KEY) || "sb_publishable_CaMU6q53y-n9p0PXW4F1Ow_bgYrD9Mm";
         const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
         function formatarCPF(val) {
@@ -134,6 +141,36 @@
         }
 
         // ==========================================
+        // Utilitários de Mascaramento para Proteção de Dados Pessoais (MED-01)
+        // ==========================================
+        function mascararDocumento(val, tipo) {
+            if (!val) return "";
+            const clean = val.replace(/\D/g, "");
+            if (tipo === 'PF' || clean.length <= 11) {
+                const cpf = formatarCPF(clean);
+                return cpf.replace(/^(\d{3})\.(\d{3})\.(\d{3})-(\d{2})$/, "$1.***.***-$2");
+            } else {
+                const cnpj = formatarCNPJ(clean);
+                return cnpj.replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})-(\d{2})$/, "$1.***.***/$4-$2");
+            }
+        }
+
+        function mascararTelefone(val) {
+            if (!val) return "";
+            const tel = formatarTelefone(val);
+            return tel.replace(/^(\(\d{2}\)\s*\d)(\d{3,4})(-\d{4})$/, (match, p1, p2, p3) => {
+                return `${p1}${'*'.repeat(p2.length)}${p3}`;
+            });
+        }
+
+        function mascararEmail(email) {
+            if (!email || !email.includes('@')) return email || '';
+            const [user, domain] = email.split('@');
+            if (user.length <= 2) return `${user[0]}*@${domain}`;
+            return `${user.slice(0, 2)}${'*'.repeat(Math.max(2, user.length - 2))}@${domain}`;
+        }
+
+        // ==========================================
         // 2. SERVIÇOS BANCO DE DADOS E RELATÓRIOS
         // ==========================================
         const authService = {
@@ -160,6 +197,16 @@
             }
         };
 
+        async function exigirAutenticacao() {
+            if (authService && authService.verificarSessaoSupabase) {
+                const { session } = await authService.verificarSessaoSupabase();
+                if (!session) {
+                    throw new Error("Acesso negado: Sessão inválida ou expirada. Faça login novamente.");
+                }
+                return session;
+            }
+        }
+
         const doadoresService = {
             buscarDoadores: async () => {
                 if (!supabaseClient) return { data: [], error: null };
@@ -171,16 +218,19 @@
             },
             criarDoador: async (dadosDoador) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 return await supabaseClient.from('doadores').insert([dadosDoador]).select();
             },
             atualizarDoador: async (idDoador, dadosDoador) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 const resultado = await supabaseClient.from('doadores').update(dadosDoador).eq('id_doador', idDoador);
                 if (resultado.error) throw resultado.error;
                 return resultado;
             },
             deletarDoadorCascata: async (idDoador) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 const { data: listDoacoes, error: errList } = await supabaseClient.from('doacoes').select('id_doacao').eq('id_doador', idDoador);
                 if (errList) throw errList;
                 if (listDoacoes && listDoacoes.length > 0) {
@@ -205,14 +255,17 @@
             },
             criarEventoDoacao: async (dadosDoacao) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 return await supabaseClient.from('doacoes').insert([dadosDoacao]).select();
             },
             criarDoacaoFinanceira: async (dadosFin) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 return await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
             },
             criarDoacaoMaterial: async (dadosMat) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 return await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
             },
             buscarDoacoesAdmin: async () => {
@@ -233,6 +286,7 @@
             },
             deletarDoacaoCompleta: async (idDoacao) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 const { error: errFin } = await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
                 if (errFin) throw errFin;
                 const { error: errMat } = await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
@@ -243,6 +297,7 @@
             },
             atualizarDoacaoCompleta: async (idDoacao, dadosPai, dadosFin, dadosMat, editHasFin, editHasMat, originalDoacao) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 const { error: errorPai } = await supabaseClient.from('doacoes').update(dadosPai).eq('id_doacao', idDoacao);
                 if (errorPai) throw errorPai;
                 if (editHasFin) {
@@ -310,12 +365,14 @@
             },
             atualizarItemEstoqueLote: async (idMaterial, dadosItem) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 const resultado = await supabaseClient.from('doacoes_materiais').update(dadosItem).eq('id_material', idMaterial);
                 if (resultado.error) throw resultado.error;
                 return resultado;
             },
             atualizarEstoqueConsolidado: async (lotes, diferenca, novosDados) => {
                 if (!supabaseClient) throw new Error("Supabase não disponível");
+                await exigirAutenticacao();
                 let diferencaRestante = diferenca;
                 const updatePromises = lotes.map((lote) => {
                     const quantidadeAtual = Number(lote.quantidade) || 0;
@@ -1888,8 +1945,14 @@
                 e.preventDefault();
                 setErrorMsg('');
                 setSuccessMsg('');
-                if (password.length < 6) {
-                    setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
+                if (password.length < 8) {
+                    setErrorMsg('A senha deve ter pelo menos 8 caracteres.');
+                    return;
+                }
+                const temLetra = /[a-zA-Z]/.test(password);
+                const temNumero = /\d/.test(password);
+                if (!temLetra || !temNumero) {
+                    setErrorMsg('A senha deve conter letras e números para maior segurança.');
                     return;
                 }
                 if (password !== confirmPassword) {
@@ -1944,11 +2007,12 @@
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">Senha</label>
-                                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength="6" placeholder="Minimo de 6 caracteres" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
+                                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength="8" placeholder="Mínimo de 8 caracteres (letras e números)" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
+                                    <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">A senha deve ter no mínimo 8 caracteres, contendo letras e números.</p>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1">Confirmar senha</label>
-                                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength="6" placeholder="Repita a senha" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
+                                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength="8" placeholder="Repita a mesma senha" className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white text-sm focus:border-rose-500" />
                                 </div>
                                 {errorMsg && <p className="text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-100 dark:border-rose-800 flex items-center gap-2"><i data-lucide="alert-triangle" className="w-4 h-4"></i>{errorMsg}</p>}
                                 {successMsg && <p className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-100 dark:border-emerald-800 flex items-center gap-2"><i data-lucide="check-circle-2" className="w-4 h-4"></i>{successMsg}</p>}
