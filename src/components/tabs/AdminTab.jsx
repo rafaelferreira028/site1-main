@@ -24,21 +24,36 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
             const { count: doadoresCount } = await window.supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
             const { count: doacoesCount } = await window.supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
 
-            const { data: finData, error: finError } = await window.supabaseClient.from('doacoes_financeiras').select('valor');
-            if (finError) throw finError;
+            const carregarColunaCompleta = async (tabela, coluna) => {
+                let itens = [];
+                let from = 0;
+                const passo = 1000;
+                let continuar = true;
+                while (continuar) {
+                    const { data, error } = await window.supabaseClient.from(tabela).select(coluna).range(from, from + passo - 1);
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        itens = itens.concat(data);
+                        if (data.length < passo) continuar = false;
+                        else from += passo;
+                    } else {
+                        continuar = false;
+                    }
+                }
+                return itens;
+            };
 
-            const totalFin = finData ? finData.reduce((acc, r) => {
+            const finData = await carregarColunaCompleta('doacoes_financeiras', 'valor');
+            const totalFin = finData.reduce((acc, r) => {
                 const val = window.sanitizarValorMonetario ? window.sanitizarValorMonetario(r.valor) : (parseFloat(r.valor) || 0);
                 return acc + val;
-            }, 0) : 0;
+            }, 0);
 
-            const { data: matData, error: matError } = await window.supabaseClient.from('doacoes_materiais').select('quantidade');
-            if (matError) throw matError;
-
-            const totalMat = matData ? matData.reduce((acc, r) => {
+            const matData = await carregarColunaCompleta('doacoes_materiais', 'quantidade');
+            const totalMat = matData.reduce((acc, r) => {
                 const q = parseFloat(r.quantidade);
                 return acc + (isNaN(q) ? 0 : q);
-            }, 0) : 0;
+            }, 0);
 
             setMetricDoadores(doadoresCount || 0);
             setMetricDoacoes(doacoesCount || 0);
@@ -81,7 +96,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId, paginaDoacoes]);
+    }, [isVisible, adminSubTab, doadoresList, doacoesList, loadingData, expandedDoadorId, paginaDoacoes]);
 
     useEffect(() => {
         setPaginaDoacoes(1);
@@ -167,7 +182,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
             }
             let matMatch = false;
             if (doacao.doacoes_materiais) {
-                matMatch = doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
+                matMatch = doacao.doacoes_materiais.some(m => (m.descricao_item || '').toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
             }
             return canalMatch || obsMatch || finMatch || matMatch;
         });
@@ -183,7 +198,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
             detMatch = detMatch || doacao.doacoes_financeiras.some(f => String(f.valor).includes(query) || (f.comprovante_transacao && f.comprovante_transacao.toLowerCase().includes(query)));
         }
         if (doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0) {
-            detMatch = detMatch || doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
+            detMatch = detMatch || doacao.doacoes_materiais.some(m => (m.descricao_item || '').toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
         }
 
         return nomeDoador.includes(query) || canal.includes(query) || obs.includes(query) || detMatch;
@@ -357,8 +372,8 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
                                                                         </span>
                                                                     )}
                                                                     {matItemsDoador.length > 0 && (
-                                                                        <span className="bg-blue-500/15 text-blue-700 border border-blue-500/30 text-[11px] px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shadow-2xs" title={matItemsDoador.map(m => `${m.descricao_item} (${m.quantidade} ${m.unidade_medida})`).join(', ')}>
-                                                                            <i data-lucide="package" className="w-3.5 h-3.5 text-blue-600"></i> {matItemsDoador.reduce((a, m) => a + parseInt(m.quantidade || 0), 0)} itens
+                                                                        <span className="bg-blue-500/15 text-blue-700 border border-blue-500/30 text-[11px] px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shadow-2xs" title={matItemsDoador.map(m => `${m.descricao_item || 'Item'} (${m.quantidade} ${m.unidade_medida || 'un'})`).join(', ')}>
+                                                                            <i data-lucide="package" className="w-3.5 h-3.5 text-blue-600"></i> {Math.round(matItemsDoador.reduce((a, m) => a + (parseFloat(m.quantidade) || 0), 0) * 100) / 100} itens
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -407,7 +422,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
                                                                             <div className="flex items-center gap-2 shrink-0">
                                                                                 <span className="text-gray-400 font-mono text-[11px]">#{idx + 1}</span>
                                                                                 <span className="bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-700">
-                                                                                    {new Date(doa.data_doacao).toLocaleDateString('pt-BR')}
+                                                                                    {window.formatarDataBR ? window.formatarDataBR(doa.data_doacao) : (doa.data_doacao || '-')}
                                                                                 </span>
                                                                                 <span className="text-gray-500 text-[11px]">Via: <strong>{doa.canal_recebimento}</strong></span>
                                                                             </div>
@@ -422,10 +437,10 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
                                                                                     <div key={i} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2">
                                                                                         <div className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
                                                                                             <i data-lucide="package" className="w-4 h-4 text-amber-500 shrink-0"></i>
-                                                                                            <span><strong>{m.descricao_item}</strong></span>
-                                                                                            <span className="text-[11px] text-gray-500">• Destino: {m.destino_item} | Estado: {m.estado_conservacao}</span>
+                                                                                            <span><strong>{m.descricao_item || 'Item sem descrição'}</strong></span>
+                                                                                            <span className="text-[11px] text-gray-500">• Destino: {m.destino_item || 'N/A'} | Estado: {m.estado_conservacao || 'N/A'}</span>
                                                                                         </div>
-                                                                                        <span className="text-[11px] font-extrabold font-mono px-2.5 py-0.5 rounded-md bg-blue-500/15 text-blue-700 border border-blue-500/25 shrink-0">{m.quantidade} {m.unidade_medida}</span>
+                                                                                        <span className="text-[11px] font-extrabold font-mono px-2.5 py-0.5 rounded-md bg-blue-500/15 text-blue-700 border border-blue-500/25 shrink-0">{m.quantidade} {m.unidade_medida || 'un'}</span>
                                                                                     </div>
                                                                                 ))}
                                                                             </div>
@@ -480,7 +495,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
                                 ) : (
                                     doacoesDaPagina.map(doacao => {
                                         const nomeDoador = doacao.doadores ? doacao.doadores.nome : 'Doador Desconhecido';
-                                        const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
+                                        const dataFmt = window.formatarDataBR ? window.formatarDataBR(doacao.data_doacao) : (doacao.data_doacao || '-');
 
                                         const hasFin = doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0;
                                         const hasMat = doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0;
@@ -512,16 +527,16 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
                                                             <div className="flex items-center justify-between gap-2">
                                                                 <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                                                                     <i data-lucide="package" className="w-4 h-4 text-amber-500 shrink-0"></i>
-                                                                    {mat.descricao_item}
+                                                                    {mat.descricao_item || 'Item sem descrição'}
                                                                 </span>
                                                                 <span className="shrink-0 text-[11px] font-extrabold font-mono px-2.5 py-0.5 rounded-md bg-blue-500/15 text-blue-700 border border-blue-500/25">
-                                                                    {mat.quantidade} {mat.unidade_medida}
+                                                                    {mat.quantidade} {mat.unidade_medida || 'un'}
                                                                 </span>
                                                             </div>
                                                             <div className="text-[11px] text-gray-500 flex items-center gap-3 font-medium pt-0.5">
-                                                                <span>Destino: <strong className="text-gray-700">{mat.destino_item}</strong></span>
+                                                                <span>Destino: <strong className="text-gray-700">{mat.destino_item || 'N/A'}</strong></span>
                                                                 <span>•</span>
-                                                                <span>Estado: <strong className="text-gray-700">{mat.estado_conservacao}</strong></span>
+                                                                <span>Estado: <strong className="text-gray-700">{mat.estado_conservacao || 'N/A'}</strong></span>
                                                             </div>
                                                         </div>
                                                     ))}

@@ -8,10 +8,8 @@
 
     <!-- Meta Tags de Segurança (MED-02, MED-03) -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://viacep.com.br; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com;">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
     <meta name="referrer" content="strict-origin-when-cross-origin">
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎗️</text></svg>">
 
     <!-- Design System & Estilos Globais -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" crossorigin="anonymous"></script>
@@ -110,14 +108,15 @@
 
         function parseDataSeguraBR(dataIso) {
             if (!dataIso) return '-';
-            const partes = String(dataIso).split('T')[0].split('-');
-            if (partes.length === 3) {
-                const ano = partes[0].slice(0, 4);
-                const mes = partes[1].padStart(2, '0');
-                const dia = partes[2].padStart(2, '0');
+            const str = String(dataIso).trim();
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+            const parteData = str.split('T')[0];
+            const match = parteData.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (match) {
+                const [, ano, mes, dia] = match;
                 return `${dia}/${mes}/${ano}`;
             }
-            return String(dataIso);
+            return '-';
         }
 
         function formatarMoeda(valor) {
@@ -150,7 +149,6 @@
                 const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, {
                     signal: controller.signal
                 });
-                clearTimeout(timeoutId);
 
                 if (!response.ok) return { error: 'Não foi possível consultar o CEP.' };
                 const data = await response.json();
@@ -171,11 +169,12 @@
                     cidadeUf: cidadeUf
                 };
             } catch (err) {
-                clearTimeout(timeoutId);
                 if (err.name === 'AbortError') {
                     return { error: 'Tempo limite ao consultar CEP. Preencha manualmente.' };
                 }
                 return { error: 'Erro ao buscar CEP.' };
+            } finally {
+                clearTimeout(timeoutId);
             }
         }
 
@@ -339,31 +338,47 @@
                 await exigirAutenticacao();
                 const { error: errorPai } = await supabaseClient.from('doacoes').update(dadosPai).eq('id_doacao', idDoacao);
                 if (errorPai) throw errorPai;
-                if (editHasFin) {
-                    const originallyHadFin = originalDoacao && originalDoacao.doacoes_financeiras && originalDoacao.doacoes_financeiras.length > 0;
-                    if (originallyHadFin) {
-                        const { error } = await supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
-                        if (error) throw error;
+                try {
+                    if (editHasFin) {
+                        const originallyHadFin = originalDoacao && originalDoacao.doacoes_financeiras && originalDoacao.doacoes_financeiras.length > 0;
+                        if (originallyHadFin) {
+                            const { error } = await supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
+                            if (error) throw error;
+                        } else {
+                            const { error } = await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                            if (error) throw error;
+                        }
                     } else {
-                        const { error } = await supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                        const { error } = await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
                         if (error) throw error;
                     }
-                } else {
-                    const { error } = await supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
-                    if (error) throw error;
-                }
-                if (editHasMat) {
-                    const originallyHadMat = originalDoacao && originalDoacao.doacoes_materiais && originalDoacao.doacoes_materiais.length > 0;
-                    if (originallyHadMat) {
-                        const { error } = await supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
-                        if (error) throw error;
+                    if (editHasMat) {
+                        const originallyHadMat = originalDoacao && originalDoacao.doacoes_materiais && originalDoacao.doacoes_materiais.length > 0;
+                        if (originallyHadMat) {
+                            const { error } = await supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
+                            if (error) throw error;
+                        } else {
+                            const { error } = await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                            if (error) throw error;
+                        }
                     } else {
-                        const { error } = await supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                        const { error } = await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
                         if (error) throw error;
                     }
-                } else {
-                    const { error } = await supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
-                    if (error) throw error;
+                } catch (childErr) {
+                    if (originalDoacao) {
+                        try {
+                            const rollbackPai = {
+                                id_doador: originalDoacao.id_doador,
+                                canal_recebimento: originalDoacao.canal_recebimento,
+                                observacoes: originalDoacao.observacoes || null
+                            };
+                            await supabaseClient.from('doacoes').update(rollbackPai).eq('id_doacao', idDoacao);
+                        } catch (errRollback) {
+                            console.error("Falha ao restaurar dados originais da doação pai:", errRollback);
+                        }
+                    }
+                    throw childErr;
                 }
                 return true;
             }
@@ -390,7 +405,7 @@
                 if (!supabaseClient) return { data: [], error: null };
                 const { data: doaData, error } = await supabaseClient
                     .from('doacoes')
-                    .select('*, doacoes_financeiras(*), doacoes_materiais(*, categorias_itens(nome_categoria)))')
+                    .select('*, doacoes_financeiras(*), doacoes_materiais(*, categorias_itens(nome_categoria))')
                     .order('data_doacao', { ascending: false });
 
                 if (error) return { data: [], error };
@@ -469,18 +484,43 @@
                     return true;
                 } catch (errLoop) {
                     console.error("Erro na atualização consolidada. Executando compensação...", errLoop);
+                    const falhasRollback = [];
                     for (const op of operacoesConcluidas) {
                         try {
                             if (op.tipo === 'delete') {
-                                await supabaseClient.from('doacoes_materiais').insert([op.loteOriginal]);
+                                const payloadRestauracao = {
+                                    id_material: op.loteOriginal.id_material,
+                                    id_doacao: op.loteOriginal.id_doacao,
+                                    id_categoria: op.loteOriginal.id_categoria,
+                                    descricao_item: op.loteOriginal.descricao_item,
+                                    quantidade: op.loteOriginal.quantidade,
+                                    unidade_medida: op.loteOriginal.unidade_medida,
+                                    estado_conservacao: op.loteOriginal.estado_conservacao,
+                                    destino_item: op.loteOriginal.destino_item
+                                };
+                                const { error: insErr } = await supabaseClient.from('doacoes_materiais').insert([payloadRestauracao]);
+                                if (insErr) throw insErr;
                             } else if (op.tipo === 'update') {
-                                await supabaseClient.from('doacoes_materiais').update({ quantidade: op.loteOriginal.quantidade }).eq('id_material', op.loteOriginal.id_material);
+                                const payloadReversao = {
+                                    quantidade: op.loteOriginal.quantidade,
+                                    descricao_item: op.loteOriginal.descricao_item,
+                                    id_categoria: op.loteOriginal.id_categoria,
+                                    unidade_medida: op.loteOriginal.unidade_medida,
+                                    estado_conservacao: op.loteOriginal.estado_conservacao,
+                                    destino_item: op.loteOriginal.destino_item
+                                };
+                                const { error: updErr } = await supabaseClient.from('doacoes_materiais').update(payloadReversao).eq('id_material', op.loteOriginal.id_material);
+                                if (updErr) throw updErr;
                             }
                         } catch (errRollback) {
                             console.error("Falha ao reverter lote #", op.loteOriginal.id_material, errRollback);
+                            falhasRollback.push({ id: op.loteOriginal.id_material, erro: errRollback.message });
                         }
                     }
-                    throw new Error(`Falha ao atualizar lotes: ${errLoop.message}. Modificações foram revertidas.`);
+                    if (falhasRollback.length > 0) {
+                        throw new Error(`Erro crítico na atualização: ${errLoop.message}. ATENÇÃO: Falha ao restaurar ${falhasRollback.length} lote(s).`);
+                    }
+                    throw new Error(`Falha ao atualizar lotes: ${errLoop.message}. Modificações foram revertidas com sucesso.`);
                 }
             }
         };
@@ -495,6 +535,9 @@
 
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                if (typeof doc.autoTable !== 'function') {
+                    throw new Error("O plugin de tabelas do PDF (autoTable) não foi carregado corretamente.");
+                }
                 const agora = new Date();
                 const dataFormatada = agora.toLocaleDateString('pt-BR');
                 const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -585,6 +628,9 @@
 
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                if (typeof doc.autoTable !== 'function') {
+                    throw new Error("O plugin de tabelas do PDF (autoTable) não foi carregado corretamente.");
+                }
                 const agora = new Date();
                 const dataFormatada = agora.toLocaleDateString('pt-BR');
                 const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -649,7 +695,7 @@
                     }
                     if (d.doacoes_materiais) {
                         d.doacoes_materiais.forEach(m => {
-                            detalhesArr.push(`[Mat] ${m.descricao_item} - ${m.quantidade} ${m.unidade_medida} (${m.destino_item || 'Estoque'})`);
+                            detalhesArr.push(`[Mat] ${m.descricao_item || 'Item'} - ${m.quantidade} ${m.unidade_medida || 'un'} (${m.destino_item || 'Estoque'})`);
                         });
                     }
                     return [index + 1, nomeDoador, dataDoacaoFmt, d.canal_recebimento || 'Presencial', detalhesArr.join(' | ') || 'Sem detalhes', d.observacoes || '-'];
@@ -713,6 +759,7 @@
                         const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, newSession) => {
                             if (!isMounted) return;
                             if (event === 'SIGNED_OUT') {
+                                try { localStorage.removeItem('site1_auth_session'); } catch (_) {}
                                 setAuthenticated(false);
                                 setSession(null);
                             } else if (newSession) {
@@ -795,7 +842,7 @@
                 </AuthContext.Provider>
             );
         }
-        function useAuth() { return useContext(AuthContext); }
+        function useAuth() { return useContext(AuthContext) || { authenticated: false, session: null, login: async () => ({ success: false }), register: async () => ({ success: false }), logout: async () => {}, checkAuth: async () => {} }; }
 
         const ThemeContext = createContext();
         const TEMAS_VALIDOS_INDEX = ['light', 'dark', 'ultra-dark'];
@@ -859,7 +906,7 @@
                 </ThemeContext.Provider>
             );
         }
-        function useTheme() { return useContext(ThemeContext); }
+        function useTheme() { return useContext(ThemeContext) || { theme: 'light', changeTheme: () => {}, menuOpen: false, toggleMenu: () => {} }; }
 
         const ToastContext = createContext();
         function ToastProvider({ children }) {
@@ -904,7 +951,7 @@
                 </ToastContext.Provider>
             );
         }
-        function useToast() { return useContext(ToastContext); }
+        function useToast() { return useContext(ToastContext) || { toasts: [], mostrarToast: () => {}, removerToast: () => {} }; }
 
         // ==========================================
         // 4. COMPONENTES UI COMUNS
@@ -1239,18 +1286,35 @@
                 return !q || d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q));
             });
 
+            const { mostrarToast } = useToast();
+
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (isSubmitting) return;
 
-                const valFinLimpo = sanitizarValorMonetario(finValor);
-                const qtdMatLimpa = parseFloat(String(matQtd).replace(',', '.')) || 0;
+                if (!checkFinanceiro && !checkMaterial) {
+                    mostrarToast('A doação deve conter ao menos um item (Financeiro ou Material). Para anular tudo, exclua a doação.', 'error');
+                    return;
+                }
+
+                const valFinLimpo = checkFinanceiro ? sanitizarValorMonetario(finValor) : null;
+                const qtdMatLimpa = checkMaterial ? (parseFloat(String(matQtd).replace(',', '.')) || 0) : 0;
+
+                if (checkFinanceiro && (!valFinLimpo || valFinLimpo <= 0)) {
+                    mostrarToast('Informe um valor financeiro válido maior que zero.', 'error');
+                    return;
+                }
+
+                if (checkMaterial && (!qtdMatLimpa || qtdMatLimpa <= 0)) {
+                    mostrarToast('Informe uma quantidade de material maior que zero.', 'error');
+                    return;
+                }
 
                 setIsSubmitting(true);
                 try {
                     await onSave({
                         idDoacao: parseInt(idDoacao, 10), idDoador: parseInt(idDoador, 10), canal, observacoes, checkFinanceiro, checkMaterial,
-                        finValor: valFinLimpo, finComprovante, matDescricao, matCategoria: parseInt(matCategoria, 10),
+                        finValor: valFinLimpo, finComprovante, matDescricao, matCategoria: parseInt(matCategoria, 10) || null,
                         matQtd: Math.round(qtdMatLimpa * 100) / 100, matUnidade, matEstado, matDestino
                     });
                 } finally {
@@ -1420,8 +1484,10 @@
             const [cidade, setCidade] = useState('');
             const [dataNascimento, setDataNascimento] = useState('');
             const [isBuscaCepLoading, setIsBuscaCepLoading] = useState(false);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const cepSeqRef = useRef(0);
 
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, tipoDoador, isBuscaCepLoading]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, tipoDoador, isBuscaCepLoading, isSubmitting]);
             if (!isVisible) return null;
 
             const handleCepChange = async (e) => {
@@ -1431,16 +1497,23 @@
 
                 const cepDigitos = valor.replace(/\D/g, '');
                 if (cepDigitos.length === 8) {
+                    const currentSeq = ++cepSeqRef.current;
                     setIsBuscaCepLoading(true);
-                    const res = await consultarCEP(cepDigitos);
-                    setIsBuscaCepLoading(false);
-                    if (res) {
-                        if (res.error) {
-                            mostrarToast(res.error, 'warning');
-                        } else {
-                            if (res.cidadeUf) setCidade(res.cidadeUf);
-                            if (res.endereco) setEndereco(res.endereco);
-                            mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+                    try {
+                        const res = await consultarCEP(cepDigitos);
+                        if (currentSeq !== cepSeqRef.current) return;
+                        if (res) {
+                            if (res.error) {
+                                mostrarToast(res.error, 'warning');
+                            } else {
+                                if (res.cidadeUf) setCidade(res.cidadeUf);
+                                if (res.endereco) setEndereco(res.endereco);
+                                mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+                            }
+                        }
+                    } finally {
+                        if (currentSeq === cepSeqRef.current) {
+                            setIsBuscaCepLoading(false);
                         }
                     }
                 }
@@ -1448,9 +1521,28 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
+                if (isSubmitting) return;
+
+                const nomeLimpo = nome ? nome.trim() : '';
+                if (!nomeLimpo) {
+                    mostrarToast('Por favor, informe o nome ou razão social.', 'error');
+                    return;
+                }
+
+                setIsSubmitting(true);
                 if (onLoadingStart) onLoadingStart();
                 try {
-                    const { error } = await doadoresService.criarDoador({ nome, tipo_doador: tipoDoador, documento: documento || null, telefone: telefone || null, email: email || null, cep: cep || null, endereco: endereco || null, cidade: cidade || null, data_nascimento: dataNascimento || null });
+                    const { error } = await doadoresService.criarDoador({
+                        nome: nomeLimpo,
+                        tipo_doador: tipoDoador,
+                        documento: documento ? documento.trim() : null,
+                        telefone: telefone ? telefone.trim() : null,
+                        email: email ? email.trim() : null,
+                        cep: cep ? cep.trim() : null,
+                        endereco: endereco ? endereco.trim() : null,
+                        cidade: cidade ? cidade.trim() : null,
+                        data_nascimento: dataNascimento || null
+                    });
                     if (error) mostrarToast('Erro ao salvar doador: ' + error.message, 'error');
                     else {
                         mostrarToast('Doador cadastrado com sucesso!', 'success');
@@ -1458,7 +1550,10 @@
                         if (onDoadorCadastrado) onDoadorCadastrado();
                     }
                 } catch (err) { mostrarToast('Erro ao salvar doador: ' + err.message, 'error'); }
-                finally { if (onLoadingEnd) onLoadingEnd(); }
+                finally {
+                    setIsSubmitting(false);
+                    if (onLoadingEnd) onLoadingEnd();
+                }
             };
 
             return (
@@ -1491,7 +1586,12 @@
                             <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Endereço / Logradouro</label><input type="text" value={endereco} onChange={(e) => setEndereco(e.target.value)} placeholder="Ex: Rua das Flores, 123 - Centro" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
                             <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Cidade / UF</label><input type="text" value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex: Astorga - PR" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
                         </div>
-                        <div className="pt-4 flex justify-end"><button type="submit" className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2"><i data-lucide="save" className="w-5 h-5"></i> Salvar Doador</button></div>
+                        <div className="pt-4 flex justify-end">
+                            <button type="submit" disabled={isSubmitting} className={`bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md transition flex items-center gap-2 ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-rose-700 cursor-pointer'}`}>
+                                <i data-lucide={isSubmitting ? "loader-2" : "save"} className={`w-5 h-5 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                                <span>{isSubmitting ? 'Salvando...' : 'Salvar Doador'}</span>
+                            </button>
+                        </div>
                     </form>
                 </div>
             );
@@ -1545,15 +1645,18 @@
 
             const selecionarPreset = (tipo) => {
                 const presets = {
-                    'bazar': { catId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
-                    'alimentos': { catId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
-                    'higiene': { catId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
-                    'cabelo': { catId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
-                    'ortopedicos': { catId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
+                    'bazar': { termo: 'bazar', fallbackId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
+                    'alimentos': { termo: 'alimento', fallbackId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
+                    'higiene': { termo: 'higiene', fallbackId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+                    'cabelo': { termo: 'cabelo', fallbackId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+                    'ortopedicos': { termo: 'ortop', fallbackId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
                 };
                 const p = presets[tipo];
                 if (!p) return;
-                setMatCategoria(p.catId); setMatDestino(p.destino); setMatUnidade(p.unidade); setMatEstado(p.estado); setMatDescricao(p.desc);
+                const catEncontrada = categorias.find(c => c.nome_categoria && c.nome_categoria.toLowerCase().includes(p.termo));
+                setCheckMaterial(true);
+                setMatCategoria(catEncontrada ? catEncontrada.id_categoria : p.fallbackId);
+                setMatDestino(p.destino); setMatUnidade(p.unidade); setMatEstado(p.estado); setMatDescricao(p.desc);
                 if (!matQtd || matQtd <= 0) setMatQtd(1);
             };
 
@@ -1587,7 +1690,8 @@
                     if (checkMaterial) {
                         const qtdLimpa = parseFloat(matQtd);
                         if (isNaN(qtdLimpa) || qtdLimpa <= 0) { throw new Error('Informe uma quantidade de material válida maior que zero.'); }
-                        const { error } = await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: parseInt(matCategoria), descricao_item: matDescricao, quantidade: Math.round(qtdLimpa * 100) / 100, unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
+                        const catId = parseInt(matCategoria, 10) || (categorias[0] ? categorias[0].id_categoria : 1);
+                        const { error } = await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: catId, descricao_item: matDescricao, quantidade: Math.round(qtdLimpa * 100) / 100, unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
                         if (error) throw error;
                     }
 
@@ -1714,12 +1818,31 @@
                     if (errDoadores) throw errDoadores;
                     const { count: doacoesCount, error: errDoacoes } = await supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
                     if (errDoacoes) throw errDoacoes;
-                    const { data: finData, error: errFin } = await supabaseClient.from('doacoes_financeiras').select('valor');
-                    if (errFin) throw errFin;
-                    const totalFin = finData ? finData.reduce((acc, r) => acc + (parseFloat(r.valor) || 0), 0) : 0;
-                    const { data: matData, error: errMat } = await supabaseClient.from('doacoes_materiais').select('quantidade');
-                    if (errMat) throw errMat;
-                    const totalMat = matData ? matData.reduce((acc, r) => acc + (parseFloat(r.quantidade) || 0), 0) : 0;
+
+                    const carregarColunaCompleta = async (tabela, coluna) => {
+                        let itens = [];
+                        let from = 0;
+                        const passo = 1000;
+                        let continuar = true;
+                        while (continuar) {
+                            const { data, error } = await supabaseClient.from(tabela).select(coluna).range(from, from + passo - 1);
+                            if (error) throw error;
+                            if (data && data.length > 0) {
+                                itens = itens.concat(data);
+                                if (data.length < passo) continuar = false;
+                                else from += passo;
+                            } else {
+                                continuar = false;
+                            }
+                        }
+                        return itens;
+                    };
+
+                    const finData = await carregarColunaCompleta('doacoes_financeiras', 'valor');
+                    const totalFin = finData.reduce((acc, r) => acc + (parseFloat(r.valor) || 0), 0);
+
+                    const matData = await carregarColunaCompleta('doacoes_materiais', 'quantidade');
+                    const totalMat = matData.reduce((acc, r) => acc + (parseFloat(r.quantidade) || 0), 0);
 
                     setMetricDoadores(doadoresCount || 0);
                     setMetricDoacoes(doacoesCount || 0);
@@ -1736,12 +1859,23 @@
                 if (onLoadingStart) onLoadingStart();
                 try {
                     await carregarMetricas();
-                    const { data: dData } = await doadoresService.buscarDoadoresTodos();
-                    setDoadoresList(dData || []);
+                    const resDoadores = await doadoresService.buscarDoadoresTodos();
+                    if (resDoadores.error) {
+                        console.error('Erro ao buscar doadores:', resDoadores.error);
+                        mostrarToast('Não foi possível carregar a lista de doadores.', 'error');
+                    }
+                    setDoadoresList(resDoadores.data || []);
 
-                    const { data: doaData } = await doacoesService.buscarDoacoesAdmin();
-                    setDoacoesList(doaData || []);
-                } catch (e) { console.error(e); }
+                    const resDoacoes = await doacoesService.buscarDoacoesAdmin();
+                    if (resDoacoes.error) {
+                        console.error('Erro ao buscar doações:', resDoacoes.error);
+                        mostrarToast('Não foi possível carregar as doações.', 'error');
+                    }
+                    setDoacoesList(resDoacoes.data || []);
+                } catch (e) {
+                    console.error('Erro no painel admin:', e);
+                    mostrarToast('Erro ao carregar dados do painel administrativo.', 'error');
+                }
                 finally {
                     setLoadingData(false);
                     if (onLoadingEnd) onLoadingEnd();
@@ -1749,7 +1883,7 @@
             };
 
             useEffect(() => { if (isVisible) carregarDadosAdmin(); }, [isVisible, refreshTrigger]);
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId, paginaDoacoes]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, loadingData, expandedDoadorId, paginaDoacoes]);
             useEffect(() => { setPaginaDoacoes(1); }, [searchQuery, adminSubTab]);
             if (!isVisible) return null;
 
@@ -1806,7 +1940,7 @@
                     let finMatch = false;
                     if (doacao.doacoes_financeiras) finMatch = doacao.doacoes_financeiras.some(f => String(f.valor).includes(query) || (f.comprovante_transacao && f.comprovante_transacao.toLowerCase().includes(query)));
                     let matMatch = false;
-                    if (doacao.doacoes_materiais) matMatch = doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
+                    if (doacao.doacoes_materiais) matMatch = doacao.doacoes_materiais.some(m => (m.descricao_item || '').toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
                     return canalMatch || obsMatch || finMatch || matMatch;
                 });
             });
@@ -1820,14 +1954,14 @@
                     detMatch = detMatch || doacao.doacoes_financeiras.some(f => String(f.valor).includes(query) || (f.comprovante_transacao && f.comprovante_transacao.toLowerCase().includes(query)));
                 }
                 if (doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0) {
-                    detMatch = detMatch || doacao.doacoes_materiais.some(m => m.descricao_item.toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
+                    detMatch = detMatch || doacao.doacoes_materiais.some(m => (m.descricao_item || '').toLowerCase().includes(query) || (m.destino_item && m.destino_item.toLowerCase().includes(query)));
                 }
                 return nomeDoador.includes(query) || canal.includes(query) || obs.includes(query) || detMatch;
             });
 
             const registrosPorPagina = 10;
             const totalPaginasDoacoes = Math.max(1, Math.ceil(doacoesFiltradas.length / registrosPorPagina));
-            const paginaAtualDoacoes = Math.min(paginaDoacoes, totalPaginasDoacoes);
+            const paginaAtualDoacoes = Math.max(1, Math.min(Number(paginaDoacoes) || 1, totalPaginasDoacoes));
             const inicioPaginaDoacoes = (paginaAtualDoacoes - 1) * registrosPorPagina;
             const doacoesDaPagina = doacoesFiltradas.slice(inicioPaginaDoacoes, inicioPaginaDoacoes + registrosPorPagina);
 
@@ -1899,7 +2033,7 @@
                                                                     <div className="space-y-1.5 max-w-xs">
                                                                         <div className="flex flex-wrap items-center gap-1.5">
                                                                             {totFinDoador > 0 && <span className="bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 text-[11px] px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shadow-2xs"><i data-lucide="dollar-sign" className="w-3.5 h-3.5 text-emerald-600"></i> {formatarMoeda(totFinDoador)}</span>}
-                                                                            {matItemsDoador.length > 0 && <span className="bg-blue-500/15 text-blue-700 border border-blue-500/30 text-[11px] px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shadow-2xs" title={matItemsDoador.map(m => `${m.descricao_item} (${m.quantidade} ${m.unidade_medida})`).join(', ')}><i data-lucide="package" className="w-3.5 h-3.5 text-blue-600"></i> {matItemsDoador.reduce((a, m) => a + parseInt(m.quantidade || 0), 0)} itens</span>}
+                                                                            {matItemsDoador.length > 0 && <span className="bg-blue-500/15 text-blue-700 border border-blue-500/30 text-[11px] px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 shadow-2xs" title={matItemsDoador.map(m => `${m.descricao_item || 'Item'} (${m.quantidade} ${m.unidade_medida || 'un'})`).join(', ')}><i data-lucide="package" className="w-3.5 h-3.5 text-blue-600"></i> {Math.round(matItemsDoador.reduce((a, m) => a + (parseFloat(m.quantidade) || 0), 0) * 100) / 100} itens</span>}
                                                                         </div>
                                                                         <button onClick={() => setExpandedDoadorId(isExpanded ? null : doador.id_doador)} className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer pt-0.5 transition"><i data-lucide={isExpanded ? "chevron-up" : "chevron-down"} className="w-3.5 h-3.5"></i> {isExpanded ? 'Ocultar detalhes' : `Ver detalhes (${doacoesDoDoador.length} doação${doacoesDoDoador.length > 1 ? 'ões' : ''})`}</button>
                                                                     </div>
@@ -1925,10 +2059,10 @@
                                                                         <div className="divide-y divide-gray-100 text-xs">
                                                                             {doacoesDoDoador.map((doa, idx) => (
                                                                                 <div key={doa.id_doacao || idx} className="py-3 flex flex-col md:flex-row md:items-start justify-between gap-3">
-                                                                                    <div className="flex items-center gap-2 shrink-0"><span className="text-gray-400 font-mono text-[11px]">#{idx + 1}</span><span className="bg-gray-100 px-2.5 py-1 rounded text-[11px] font-semibold text-gray-700">{new Date(doa.data_doacao).toLocaleDateString('pt-BR')}</span><span className="text-gray-500 text-[11px]">Via: <strong>{doa.canal_recebimento}</strong></span></div>
+                                                                                    <div className="flex items-center gap-2 shrink-0"><span className="text-gray-400 font-mono text-[11px]">#{idx + 1}</span><span className="bg-gray-100 px-2.5 py-1 rounded text-[11px] font-semibold text-gray-700">{parseDataSeguraBR(doa.data_doacao)}</span><span className="text-gray-500 text-[11px]">Via: <strong>{doa.canal_recebimento || 'Presencial'}</strong></span></div>
                                                                                     <div className="flex-1 space-y-1.5">
                                                                                         {doa.doacoes_financeiras && doa.doacoes_financeiras.map((f, i) => (<div key={i} className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 font-extrabold text-xs border border-emerald-500/30"><span>💰 {formatarMoeda(f.valor)}</span>{f.comprovante_transacao && <span className="text-gray-500 font-mono text-[10px] font-normal">(Nº {f.comprovante_transacao})</span>}</div>))}
-                                                                                        {doa.doacoes_materiais && doa.doacoes_materiais.map((m, i) => (<div key={i} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2"><div className="font-semibold text-slate-800 text-xs flex items-center gap-1.5"><i data-lucide="package" className="w-4 h-4 text-amber-500 shrink-0"></i><span><strong>{m.descricao_item}</strong></span><span className="text-[11px] text-gray-500">• Destino: {m.destino_item} | Estado: {m.estado_conservacao}</span></div><span className="text-[11px] font-extrabold font-mono px-2.5 py-0.5 rounded-md bg-blue-500/15 text-blue-700 border border-blue-500/25 shrink-0">{m.quantidade} {m.unidade_medida}</span></div>))}
+                                                                                        {doa.doacoes_materiais && doa.doacoes_materiais.map((m, i) => (<div key={i} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2"><div className="font-semibold text-slate-800 text-xs flex items-center gap-1.5"><i data-lucide="package" className="w-4 h-4 text-amber-500 shrink-0"></i><span><strong>{m.descricao_item || 'Item sem descrição'}</strong></span><span className="text-[11px] text-gray-500">• Destino: {m.destino_item || 'N/A'} | Estado: {m.estado_conservacao || 'N/A'}</span></div><span className="text-[11px] font-extrabold font-mono px-2.5 py-0.5 rounded-md bg-blue-500/15 text-blue-700 border border-blue-500/25 shrink-0">{m.quantidade} {m.unidade_medida || 'un'}</span></div>))}
                                                                                     </div>
                                                                                     {doa.observacoes && <div className="text-[11px] text-gray-500 italic max-w-xs truncate bg-gray-50 p-2 rounded-lg border border-gray-100" title={doa.observacoes}>Obs: {doa.observacoes}</div>}
                                                                                 </div>
@@ -1969,7 +2103,7 @@
                                         ) : (
                                             doacoesDaPagina.map(doacao => {
                                                 const nomeDoador = doacao.doadores ? doacao.doadores.nome : 'Doador Desconhecido';
-                                                const dataFmt = new Date(doacao.data_doacao).toLocaleDateString('pt-BR');
+                                                const dataFmt = parseDataSeguraBR(doacao.data_doacao);
                                                 const hasFin = doacao.doacoes_financeiras && doacao.doacoes_financeiras.length > 0;
                                                 const hasMat = doacao.doacoes_materiais && doacao.doacoes_materiais.length > 0;
 
@@ -1996,16 +2130,16 @@
                                                                     <div className="flex items-center justify-between gap-2">
                                                                         <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                                                                             <i data-lucide="package" className="w-4 h-4 text-amber-500 shrink-0"></i>
-                                                                            {mat.descricao_item}
+                                                                            {mat.descricao_item || 'Item sem descrição'}
                                                                         </span>
                                                                         <span className="shrink-0 text-[11px] font-extrabold font-mono px-2.5 py-0.5 rounded-md bg-blue-500/15 text-blue-700 border border-blue-500/25">
-                                                                            {mat.quantidade} {mat.unidade_medida}
+                                                                            {mat.quantidade} {mat.unidade_medida || 'un'}
                                                                         </span>
                                                                     </div>
                                                                     <div className="text-[11px] text-gray-500 flex items-center gap-3 font-medium pt-0.5">
-                                                                        <span>Destino: <strong className="text-gray-700">{mat.destino_item}</strong></span>
+                                                                        <span>Destino: <strong className="text-gray-700">{mat.destino_item || 'N/A'}</strong></span>
                                                                         <span>•</span>
-                                                                        <span>Estado: <strong className="text-gray-700">{mat.estado_conservacao}</strong></span>
+                                                                        <span>Estado: <strong className="text-gray-700">{mat.estado_conservacao || 'N/A'}</strong></span>
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -2058,12 +2192,20 @@
             const carregarEstoque = async () => {
                 if (onLoadingStart) onLoadingStart();
                 try {
-                    const { data: matData } = await estoqueService.buscarEstoqueMateriais();
-                    const listMat = matData || [];
+                    const resMat = await estoqueService.buscarEstoqueMateriais();
+                    if (resMat.error) {
+                        console.error('Erro ao buscar estoque:', resMat.error);
+                        mostrarToast('Não foi possível carregar os materiais do estoque.', 'error');
+                    }
+                    const listMat = resMat.data || [];
                     setEstoqueList(listMat);
 
-                    const { data: doaData } = await estoqueService.buscarEstoqueDoacoesCanais();
-                    setEstoqueDoacoesList(doaData || []);
+                    const resDoa = await estoqueService.buscarEstoqueDoacoesCanais();
+                    if (resDoa.error) {
+                        console.error('Erro ao buscar doações por canais:', resDoa.error);
+                        mostrarToast('Não foi possível carregar canais do estoque.', 'error');
+                    }
+                    setEstoqueDoacoesList(resDoa.data || []);
 
                     const bazarSum = listMat.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, item) => acc + (parseFloat(item.quantidade) || 0), 0);
                     const alimentosSum = listMat.filter(m => m.id_categoria === 2).reduce((acc, item) => acc + (parseFloat(item.quantidade) || 0), 0);
@@ -2082,7 +2224,7 @@
             };
 
             useEffect(() => { if (isVisible) carregarEstoque(); }, [isVisible, refreshTrigger]);
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueSubTab, modoVisao, searchQuery, estoqueList]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueSubTab, modoVisao, estoqueList]);
             if (!isVisible) return null;
 
             const handlePDF = async () => {
@@ -2105,7 +2247,7 @@
                 materiaisFiltrados = estoqueList.filter(m => m.id_categoria === mapCat[estoqueSubTab]);
             }
 
-            if (q) materiaisFiltrados = materiaisFiltrados.filter(m => m.descricao_item.toLowerCase().includes(q) || m.destino_item.toLowerCase().includes(q));
+            if (q) materiaisFiltrados = materiaisFiltrados.filter(m => (m.descricao_item || '').toLowerCase().includes(q) || (m.destino_item || '').toLowerCase().includes(q));
 
             const gruposConsolidados = {};
             if (modoVisao === 'consolidado') {
@@ -2113,9 +2255,11 @@
                     const categoria = item.destino_item === 'Bazar' || item.id_categoria === 6
                         ? 'Bazar'
                         : (item.categorias_itens?.nome_categoria || 'Sem categoria');
-                    const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
+                    const unidade = item.unidade_medida || 'Itens';
+                    const destino = item.destino_item || 'Estoque Geral';
+                    const key = `cat-${item.id_categoria || categoria.toLowerCase()}_un-${unidade.toLowerCase()}_dest-${destino.toLowerCase()}`;
                     if (!gruposConsolidados[key]) {
-                        gruposConsolidados[key] = { key, descricao: categoria, quantidadeTotal: 0, unidade: 'Itens', destino: item.destino_item || 'Estoque Geral', lotes: [] };
+                        gruposConsolidados[key] = { key, id_categoria: item.id_categoria, descricao: categoria, quantidadeTotal: 0, unidade: unidade, destino: destino, lotes: [] };
                     }
                     gruposConsolidados[key].quantidadeTotal = Math.round((gruposConsolidados[key].quantidadeTotal + (parseFloat(item.quantidade) || 0)) * 100) / 100;
                     gruposConsolidados[key].lotes.push(item);
@@ -2167,13 +2311,21 @@
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-xs">
                                     {modoVisao === 'consolidado' ? (
-                                        Object.values(gruposConsolidados).map(g => (
-                                            <tr key={g.key} className="hover:bg-gray-50"><td className="px-6 py-4 font-bold">{g.descricao}</td><td className="px-6 py-4 text-center font-extrabold text-rose-600">{g.quantidadeTotal}</td><td className="px-6 py-4">{g.unidade}</td>{estoqueSubTab !== 'Geral' && <td className="px-6 py-4">{g.destino}</td>}<td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoqueConsolidado(g)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
-                                        ))
+                                        Object.values(gruposConsolidados).length === 0 ? (
+                                            <tr><td colSpan={estoqueSubTab !== 'Geral' ? 5 : 4} className="px-6 py-8 text-center text-gray-400">Nenhum item encontrado no estoque consolidado.</td></tr>
+                                        ) : (
+                                            Object.values(gruposConsolidados).map(g => (
+                                                <tr key={g.key} className="hover:bg-gray-50"><td className="px-6 py-4 font-bold">{g.descricao}</td><td className="px-6 py-4 text-center font-extrabold text-rose-600">{g.quantidadeTotal}</td><td className="px-6 py-4">{g.unidade}</td>{estoqueSubTab !== 'Geral' && <td className="px-6 py-4">{g.destino}</td>}<td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoqueConsolidado(g)} className="bg-blue-50 text-blue-600 p-2 rounded-lg cursor-pointer hover:bg-blue-100 transition"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
+                                            ))
+                                        )
                                     ) : (
-                                        materiaisFiltrados.map(m => (
-                                            <tr key={m.id_material} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium">{m.descricao_item}</td><td className="px-6 py-4 text-center font-bold">{m.quantidade}</td><td className="px-6 py-4">{m.unidade_medida}</td><td className="px-6 py-4">{m.destino_item}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoque(m)} className="bg-blue-50 text-blue-600 p-2 rounded-lg"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
-                                        ))
+                                        materiaisFiltrados.length === 0 ? (
+                                            <tr><td colSpan="5" className="px-6 py-8 text-center text-gray-400">Nenhum item encontrado no estoque por lotes.</td></tr>
+                                        ) : (
+                                            materiaisFiltrados.map(m => (
+                                                <tr key={m.id_material} className="hover:bg-gray-50"><td className="px-6 py-4 font-medium">{m.descricao_item || 'Item sem descrição'}</td><td className="px-6 py-4 text-center font-bold">{m.quantidade}</td><td className="px-6 py-4">{m.unidade_medida || 'un'}</td><td className="px-6 py-4">{m.destino_item || 'Estoque Geral'}</td><td className="px-6 py-4 text-center"><button onClick={() => onOpenEditEstoque(m)} className="bg-blue-50 text-blue-600 p-2 rounded-lg cursor-pointer hover:bg-blue-100 transition"><i data-lucide="pencil" className="w-4 h-4"></i></button></td></tr>
+                                            ))
+                                        )
                                     )}
                                 </tbody>
                             </table>
@@ -2266,10 +2418,10 @@
                         </div>
                         {mode === 'login' && (
                         <form id="form-global-login" onSubmit={handleLoginSubmit} className="space-y-4">
-                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail Corporativo</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="E-mail de Acesso" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Senha de Acesso</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Senha de Acesso" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">E-mail ou ID de Acesso *</label><input type="text" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="Digite seu e-mail ou identificador (ex: admin)" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Senha de Acesso *</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Senha de Acesso" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:border-rose-500" /></div>
                             {errorMsg && <p className="text-xs font-bold text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-center gap-2"><i data-lucide="alert-triangle" className="w-4 h-4"></i> {errorMsg}</p>}
-                            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2"><i data-lucide="log-in" className="w-4 h-4"></i> Entrar no Sistema</button>
+                            <button type="submit" disabled={isSubmitting} className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"><i data-lucide={isSubmitting ? "loader-2" : "log-in"} className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`}></i> {isSubmitting ? 'Entrando...' : 'Entrar no Sistema'}</button>
                         </form>
                         )}
 
@@ -2326,11 +2478,16 @@
 
             const carregarDadosApp = async () => {
                 try {
-                    const { data: dData } = await doadoresService.buscarDoadores();
+                    const { data: dData, error: errD } = await doadoresService.buscarDoadores();
+                    if (errD) throw errD;
                     setDoadoresGlobal(dData || []);
-                    const { data: cData } = await doacoesService.buscarCategoriasItens();
+                    const { data: cData, error: errC } = await doacoesService.buscarCategoriasItens();
+                    if (errC) throw errC;
                     setCategoriasGlobal(cData || []);
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    console.error("Erro ao carregar dados operacionais:", e);
+                    mostrarToast('Não foi possível sincronizar categorias e doadores com o servidor.', 'error');
+                }
             };
 
             useEffect(() => { carregarDadosApp(); }, []);
@@ -2399,21 +2556,33 @@
             const { mostrarToast } = useToast();
             const [progressWidth, setProgressWidth] = useState(0);
             const [progressOpacity, setProgressOpacity] = useState(0);
+            const progressTimersRef = useRef([]);
+
+            const limparTimersProgresso = () => {
+                progressTimersRef.current.forEach(clearTimeout);
+                progressTimersRef.current = [];
+            };
 
             const handleLoadingStart = () => {
+                limparTimersProgresso();
                 setProgressOpacity(1);
                 setProgressWidth(0);
-                setTimeout(() => setProgressWidth(30), 50);
-                setTimeout(() => setProgressWidth(70), 200);
+                progressTimersRef.current.push(setTimeout(() => setProgressWidth(30), 50));
+                progressTimersRef.current.push(setTimeout(() => setProgressWidth(70), 200));
             };
 
             const handleLoadingEnd = () => {
+                limparTimersProgresso();
                 setProgressWidth(100);
-                setTimeout(() => {
+                progressTimersRef.current.push(setTimeout(() => {
                     setProgressOpacity(0);
-                    setTimeout(() => setProgressWidth(0), 300);
-                }, 200);
+                    progressTimersRef.current.push(setTimeout(() => setProgressWidth(0), 300));
+                }, 200));
             };
+
+            useEffect(() => {
+                return () => limparTimersProgresso();
+            }, []);
 
             return (
                 <ThemeProvider onShowToast={mostrarToast}>

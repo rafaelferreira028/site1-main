@@ -93,6 +93,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
         const p = presets[tipo];
         if (!p) return;
 
+        setCheckMaterial(true);
         // Tenta achar categoria correspondente dinamicamente pelo nome
         const catEncontrada = categorias.find(c => c.nome_categoria && c.nome_categoria.toLowerCase().includes(p.termo));
         setMatCategoria(catEncontrada ? catEncontrada.id_categoria : p.fallbackId);
@@ -163,7 +164,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
 
                 const dadosMat = {
                     id_doacao: idDoacaoGerado,
-                    id_categoria: parseInt(matCategoria, 10),
+                    id_categoria: parseInt(matCategoria, 10) || (categorias[0] ? categorias[0].id_categoria : 1),
                     descricao_item: matDescricao ? matDescricao.trim() : 'Item sem descrição',
                     quantidade: Math.round(qtdLimpa * 100) / 100,
                     unidade_medida: matUnidade,

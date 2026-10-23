@@ -72,32 +72,48 @@ async function atualizarDoacaoCompleta(idDoacao, dadosPai, dadosFin, dadosMat, e
     const { error: errorPai } = await window.supabaseClient.from('doacoes').update(dadosPai).eq('id_doacao', idDoacao);
     if (errorPai) throw errorPai;
 
-    if (editHasFin) {
-        const originallyHadFin = originalDoacao && originalDoacao.doacoes_financeiras && originalDoacao.doacoes_financeiras.length > 0;
-        if (originallyHadFin) {
-            const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
-            if (errFin) throw errFin;
+    try {
+        if (editHasFin) {
+            const originallyHadFin = originalDoacao && originalDoacao.doacoes_financeiras && originalDoacao.doacoes_financeiras.length > 0;
+            if (originallyHadFin) {
+                const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').update(dadosFin).eq('id_doacao', idDoacao);
+                if (errFin) throw errFin;
+            } else {
+                const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+                if (errFin) throw errFin;
+            }
         } else {
-            const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').insert([dadosFin]);
+            const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
             if (errFin) throw errFin;
         }
-    } else {
-        const { error: errFin } = await window.supabaseClient.from('doacoes_financeiras').delete().eq('id_doacao', idDoacao);
-        if (errFin) throw errFin;
-    }
 
-    if (editHasMat) {
-        const originallyHadMat = originalDoacao && originalDoacao.doacoes_materiais && originalDoacao.doacoes_materiais.length > 0;
-        if (originallyHadMat) {
-            const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
-            if (errMat) throw errMat;
+        if (editHasMat) {
+            const originallyHadMat = originalDoacao && originalDoacao.doacoes_materiais && originalDoacao.doacoes_materiais.length > 0;
+            if (originallyHadMat) {
+                const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').update(dadosMat).eq('id_doacao', idDoacao);
+                if (errMat) throw errMat;
+            } else {
+                const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+                if (errMat) throw errMat;
+            }
         } else {
-            const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').insert([dadosMat]);
+            const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
             if (errMat) throw errMat;
         }
-    } else {
-        const { error: errMat } = await window.supabaseClient.from('doacoes_materiais').delete().eq('id_doacao', idDoacao);
-        if (errMat) throw errMat;
+    } catch (errFilho) {
+        if (originalDoacao) {
+            try {
+                const rollbackPai = {
+                    id_doador: originalDoacao.id_doador,
+                    canal_recebimento: originalDoacao.canal_recebimento,
+                    observacoes: originalDoacao.observacoes || null
+                };
+                await window.supabaseClient.from('doacoes').update(rollbackPai).eq('id_doacao', idDoacao);
+            } catch (errRollback) {
+                console.error("Falha ao restaurar dados originais da doação pai:", errRollback);
+            }
+        }
+        throw errFilho;
     }
 
     return true;

@@ -1,9 +1,9 @@
 // Handlers de Máscara em Inputs HTML nativos
 
 function aplicarMascaraInput(inputElement, formatarFn) {
-    if (!inputElement) return;
+    if (!inputElement) return () => {};
 
-    inputElement.addEventListener('keydown', (e) => {
+    const handleKeyDown = (e) => {
         if (e.key === 'Backspace') {
             const pos = inputElement.selectionStart;
             const val = inputElement.value;
@@ -29,9 +29,9 @@ function aplicarMascaraInput(inputElement, formatarFn) {
                 }
             }
         }
-    });
+    };
 
-    inputElement.addEventListener('input', (e) => {
+    const handleInput = (e) => {
         const cursorPosition = inputElement.selectionStart;
         const oldVal = inputElement.value;
         const newVal = formatarFn(oldVal);
@@ -58,7 +58,15 @@ function aplicarMascaraInput(inputElement, formatarFn) {
         }
 
         inputElement.setSelectionRange(newPos, newPos);
-    });
+    };
+
+    inputElement.addEventListener('keydown', handleKeyDown);
+    inputElement.addEventListener('input', handleInput);
+
+    return () => {
+        inputElement.removeEventListener('keydown', handleKeyDown);
+        inputElement.removeEventListener('input', handleInput);
+    };
 }
 
 window.aplicarMascaraInput = aplicarMascaraInput;

@@ -37,6 +37,8 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
         setIsSubmitting(false);
     };
 
+    const cepSeqRef = React.useRef(0);
+
     const handleCepChange = async (e) => {
         const valor = e.target.value;
         const formatado = window.formatarCEP ? window.formatarCEP(valor) : valor;
@@ -44,11 +46,13 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
 
         const cepDigitos = valor.replace(/\D/g, '');
         if (cepDigitos.length === 8) {
+            const currentSeq = ++cepSeqRef.current;
             setIsBuscaCepLoading(true);
             try {
                 const fnConsulta = window.consultarCEP || (typeof consultarCEP !== 'undefined' ? consultarCEP : null);
                 if (fnConsulta) {
                     const res = await fnConsulta(cepDigitos);
+                    if (currentSeq !== cepSeqRef.current) return;
                     if (res) {
                         if (res.error) {
                             mostrarToast(res.error, 'warning');
@@ -63,7 +67,9 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
                 console.error("Falha ao consultar CEP:", err);
                 mostrarToast('Não foi possível obter dados automáticos do CEP.', 'warning');
             } finally {
-                setIsBuscaCepLoading(false);
+                if (currentSeq === cepSeqRef.current) {
+                    setIsBuscaCepLoading(false);
+                }
             }
         }
     };

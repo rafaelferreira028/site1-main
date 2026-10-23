@@ -31,7 +31,7 @@ async function buscarEstoqueDoacoesCanais() {
     if (!window.supabaseClient) return { data: [], error: null };
     const { data: doaData, error } = await window.supabaseClient
         .from('doacoes')
-        .select('*, doacoes_financeiras(*), doacoes_materiais(*, categorias_itens(nome_categoria)))')
+        .select('*, doacoes_financeiras(*), doacoes_materiais(*, categorias_itens(nome_categoria))')
         .order('data_doacao', { ascending: false });
 
     if (error) return { data: [], error };
@@ -113,19 +113,43 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
         }
         return true;
     } catch (errLoop) {
-        console.error("Erro na atualização consolidada. Executando compensação...", errLoop);
+        const falhasRollback = [];
         for (const op of operacoesConcluidas) {
             try {
                 if (op.tipo === 'delete') {
-                    await window.supabaseClient.from('doacoes_materiais').insert([op.loteOriginal]);
+                    const payloadRestauracao = {
+                        id_material: op.loteOriginal.id_material,
+                        id_doacao: op.loteOriginal.id_doacao,
+                        id_categoria: op.loteOriginal.id_categoria,
+                        descricao_item: op.loteOriginal.descricao_item,
+                        quantidade: op.loteOriginal.quantidade,
+                        unidade_medida: op.loteOriginal.unidade_medida,
+                        estado_conservacao: op.loteOriginal.estado_conservacao,
+                        destino_item: op.loteOriginal.destino_item
+                    };
+                    const { error: insErr } = await window.supabaseClient.from('doacoes_materiais').insert([payloadRestauracao]);
+                    if (insErr) throw insErr;
                 } else if (op.tipo === 'update') {
-                    await window.supabaseClient.from('doacoes_materiais').update({ quantidade: op.loteOriginal.quantidade }).eq('id_material', op.loteOriginal.id_material);
+                    const payloadReversao = {
+                        quantidade: op.loteOriginal.quantidade,
+                        descricao_item: op.loteOriginal.descricao_item,
+                        id_categoria: op.loteOriginal.id_categoria,
+                        unidade_medida: op.loteOriginal.unidade_medida,
+                        estado_conservacao: op.loteOriginal.estado_conservacao,
+                        destino_item: op.loteOriginal.destino_item
+                    };
+                    const { error: updErr } = await window.supabaseClient.from('doacoes_materiais').update(payloadReversao).eq('id_material', op.loteOriginal.id_material);
+                    if (updErr) throw updErr;
                 }
             } catch (errRollback) {
                 console.error("Falha ao reverter lote #", op.loteOriginal.id_material, errRollback);
+                falhasRollback.push({ id: op.loteOriginal.id_material, erro: errRollback.message });
             }
         }
-        throw new Error(`Falha ao atualizar lotes: ${errLoop.message}. Modificações foram revertidas.`);
+        if (falhasRollback.length > 0) {
+            throw new Error(`Erro crítico na atualização: ${errLoop.message}. ATENÇÃO: Falha ao restaurar ${falhasRollback.length} lote(s).`);
+        }
+        throw new Error(`Falha ao atualizar lotes: ${errLoop.message}. As modificações foram revertidas.`);
     }
 }
 

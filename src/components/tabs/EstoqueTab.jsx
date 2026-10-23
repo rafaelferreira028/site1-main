@@ -64,7 +64,7 @@ function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEs
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, estoqueSubTab, modoVisao, searchQuery, estoqueList, estoqueDoacoesList, loadingData]);
+    }, [isVisible, estoqueSubTab, modoVisao, estoqueList, estoqueDoacoesList, loadingData]);
 
     if (!isVisible) return null;
 
@@ -102,7 +102,7 @@ function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEs
             }
             if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {
                 hasMatMatch = d.doacoes_materiais.some(mat => {
-                    const catName = mat.categorias_itens ? mat.categorias_itens.nome_categoria.toLowerCase() : '';
+                    const catName = mat.categorias_itens?.nome_categoria ? mat.categorias_itens.nome_categoria.toLowerCase() : '';
                     return (mat.descricao_item && mat.descricao_item.toLowerCase().includes(query)) ||
                         catName.includes(query) ||
                         (mat.destino_item && mat.destino_item.toLowerCase().includes(query)) ||
@@ -122,7 +122,7 @@ function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEs
     } else {
         const mapCat = { 'Alimentos': 2, 'Higiene': 3, 'Cabelo': 4, 'Ortopedicos': 5 };
         const catId = mapCat[estoqueSubTab];
-        materiaisFiltrados = estoqueList.filter(m => m.id_categoria === catId || (m.categorias_itens && m.categorias_itens.nome_categoria.toLowerCase().includes(estoqueSubTab.toLowerCase())));
+        materiaisFiltrados = estoqueList.filter(m => m.id_categoria === catId || (m.categorias_itens?.nome_categoria && m.categorias_itens.nome_categoria.toLowerCase().includes(estoqueSubTab.toLowerCase())));
     }
 
     if (query) {
@@ -139,14 +139,16 @@ function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEs
     if (modoVisao === 'consolidado') {
         materiaisFiltrados.forEach(item => {
             const categoria = item.categorias_itens?.nome_categoria || 'Sem categoria';
-            const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
+            const unidade = item.unidade_medida || 'Itens';
+            const destino = item.destino_item || 'Estoque Geral';
+            const key = `cat-${item.id_categoria || categoria.toLowerCase()}_un-${unidade.toLowerCase()}_dest-${destino.toLowerCase()}`;
             if (!gruposConsolidados[key]) {
                 gruposConsolidados[key] = {
                     key,
                     descricao: categoria,
                     quantidadeTotal: 0,
-                    unidade: item.unidade_medida || 'Itens',
-                    destino: item.destino_item || 'Estoque Geral',
+                    unidade: unidade,
+                    destino: destino,
                     estado: 'Não se aplica',
                     id_categoria: item.id_categoria || null,
                     lotes: []

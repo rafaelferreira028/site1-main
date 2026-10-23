@@ -67,14 +67,15 @@ function sanitizarValorMonetario(val) {
 
 function parseDataSeguraBR(dataIso) {
     if (!dataIso) return '-';
-    const partes = String(dataIso).split('T')[0].split('-');
-    if (partes.length === 3) {
-        const ano = partes[0].slice(0, 4);
-        const mes = partes[1].padStart(2, '0');
-        const dia = partes[2].padStart(2, '0');
+    const str = String(dataIso).trim();
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+    const parteData = str.split('T')[0];
+    const match = parteData.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+        const [, ano, mes, dia] = match;
         return `${dia}/${mes}/${ano}`;
     }
-    return String(dataIso);
+    return '-';
 }
 
 function formatarMoeda(valor) {
@@ -116,7 +117,6 @@ async function consultarCEP(cep) {
         const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, {
             signal: controller.signal
         });
-        clearTimeout(timeoutId);
 
         if (!response.ok) return { error: 'Não foi possível consultar o CEP.' };
         const data = await response.json();
@@ -137,11 +137,12 @@ async function consultarCEP(cep) {
             cidadeUf: cidadeUf
         };
     } catch (err) {
-        clearTimeout(timeoutId);
         if (err.name === 'AbortError') {
             return { error: 'Tempo limite ao consultar CEP. Preencha manualmente.' };
         }
         return { error: 'Erro ao buscar CEP. Verifique a conexão com a internet.' };
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 

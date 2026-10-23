@@ -22,6 +22,10 @@ async function exportarPDFEstoqueOficial() {
         format: 'a4'
     });
 
+    if (typeof doc.autoTable !== 'function') {
+        throw new Error("O plugin de tabelas do PDF (autoTable) não foi carregado corretamente.");
+    }
+
     const agora = new Date();
     const dataFormatada = agora.toLocaleDateString('pt-BR');
     const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -153,6 +157,10 @@ async function exportarPDFDoacoesOficial() {
         format: 'a4'
     });
 
+    if (typeof doc.autoTable !== 'function') {
+        throw new Error("O plugin de tabelas do PDF (autoTable) não foi carregado corretamente.");
+    }
+
     const agora = new Date();
     const dataFormatada = agora.toLocaleDateString('pt-BR');
     const horaFormatada = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -227,7 +235,7 @@ async function exportarPDFDoacoesOficial() {
         }
         if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {
             d.doacoes_materiais.forEach(m => {
-                detalhesArr.push(`[Mat] ${m.descricao_item} - ${m.quantidade} ${m.unidade_medida} (${m.destino_item || 'Estoque'})`);
+                detalhesArr.push(`[Mat] ${m.descricao_item || 'Item'} - ${m.quantidade} ${m.unidade_medida || 'un'} (${m.destino_item || 'Estoque'})`);
             });
         }
 

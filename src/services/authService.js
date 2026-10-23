@@ -61,7 +61,9 @@ function getUsuariosLocais() {
     }];
     try {
         localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(padrao));
-    } catch (e) {}
+    } catch (e) {
+        console.warn("[Auth] Não foi possível persistir usuário inicial no storage:", e);
+    }
     return padrao;
 }
 
@@ -169,7 +171,12 @@ async function realizarLoginFlexivel(identificadorOuEmail, password) {
             };
             try {
                 localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessaoLocal));
-            } catch (e) {}
+            } catch (e) {
+                console.error("[Auth] Falha ao persistir sessão local:", e);
+                if (e.name === 'QuotaExceededError') {
+                    throw new Error("Armazenamento do navegador cheio. Limpe o histórico do navegador para fazer login.");
+                }
+            }
             return { data: { session: sessaoLocal, user: sessaoLocal.user }, error: null };
         } else {
             throw new Error("Senha incorreta. Verifique e tente novamente.");

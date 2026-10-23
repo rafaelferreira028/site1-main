@@ -81,16 +81,33 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
             (d.email && d.email.toLowerCase().includes(query));
     });
 
+    const { mostrarToast } = window.useToast ? window.useToast() : { mostrarToast: (msg) => alert(msg) };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (isSubmitting) return;
+
+        if (!checkFinanceiro && !checkMaterial) {
+            mostrarToast('A doação deve conter ao menos um item (Financeiro ou Material). Para anular tudo, exclua a doação.', 'error');
+            return;
+        }
 
         const valorFinLimpo = checkFinanceiro
             ? (window.sanitizarValorMonetario ? window.sanitizarValorMonetario(finValor) : (parseFloat(String(finValor).replace(',', '.')) || 0))
             : null;
         const qtdMatLimpa = checkMaterial
-            ? (parseFloat(matQtd) || 1)
-            : 1;
+            ? (parseFloat(matQtd) || 0)
+            : 0;
+
+        if (checkFinanceiro && (!valorFinLimpo || valorFinLimpo <= 0)) {
+            mostrarToast('Informe um valor financeiro válido maior que zero.', 'error');
+            return;
+        }
+
+        if (checkMaterial && (!qtdMatLimpa || qtdMatLimpa <= 0)) {
+            mostrarToast('Informe uma quantidade de material maior que zero.', 'error');
+            return;
+        }
 
         setIsSubmitting(true);
         try {
@@ -117,15 +134,17 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
 
     const selecionarPreset = (tipo) => {
         const presets = {
-            'bazar': { catId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
-            'alimentos': { catId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
-            'higiene': { catId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
-            'cabelo': { catId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
-            'ortopedicos': { catId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
+            'bazar': { termo: 'bazar', fallbackId: 6, desc: 'Itens de Bazar / Vestuário', unidade: 'Unidade', estado: 'Novo', destino: 'Bazar' },
+            'alimentos': { termo: 'alimento', fallbackId: 2, desc: 'Cesta Básica / Alimentos', unidade: 'Pacote', estado: 'Não se aplica', destino: 'Estoque Geral' },
+            'higiene': { termo: 'higiene', fallbackId: 3, desc: 'Produtos de Higiene Pessoal', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+            'cabelo': { termo: 'cabelo', fallbackId: 4, desc: 'Peruca / Cabelo para Doação', unidade: 'Unidade', estado: 'Novo', destino: 'Estoque Geral' },
+            'ortopedicos': { termo: 'ortop', fallbackId: 5, desc: 'Equipamento Ortopédico', unidade: 'Unidade', estado: 'Seminovo', destino: 'Uso Direto Paciente' }
         };
         const p = presets[tipo];
         if (!p) return;
-        setMatCategoria(p.catId);
+        setCheckMaterial(true);
+        const catEncontrada = categorias.find(c => c.nome_categoria && c.nome_categoria.toLowerCase().includes(p.termo));
+        setMatCategoria(catEncontrada ? catEncontrada.id_categoria : p.fallbackId);
         setMatDestino(p.destino);
         setMatUnidade(p.unidade);
         setMatEstado(p.estado);
