@@ -67,48 +67,66 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
     }
 
     let diferencaRestante = diferencaNum;
+    const operacoesConcluidas = [];
 
-    for (const lote of lotes) {
-        const quantidadeAtual = parseFloat(lote.quantidade) || 0;
-        let qtdLote = quantidadeAtual;
+    try {
+        for (const lote of lotes) {
+            const quantidadeAtual = parseFloat(lote.quantidade) || 0;
+            let qtdLote = quantidadeAtual;
 
-        if (diferencaRestante > 0) {
-            qtdLote += diferencaRestante;
-            diferencaRestante = 0;
-        } else if (diferencaRestante < 0) {
-            const reducao = Math.min(quantidadeAtual, -diferencaRestante);
-            qtdLote -= reducao;
-            diferencaRestante += reducao;
+            if (diferencaRestante > 0) {
+                qtdLote += diferencaRestante;
+                diferencaRestante = 0;
+            } else if (diferencaRestante < 0) {
+                const reducao = Math.min(quantidadeAtual, -diferencaRestante);
+                qtdLote -= reducao;
+                diferencaRestante += reducao;
+            }
+
+            const payloadAtualizacao = {
+                quantidade: Math.round(qtdLote * 100) / 100
+            };
+
+            if (novosDados) {
+                if (novosDados.descricao_item) payloadAtualizacao.descricao_item = novosDados.descricao_item;
+                if (novosDados.id_categoria) payloadAtualizacao.id_categoria = Number(novosDados.id_categoria);
+                if (novosDados.unidade_medida) payloadAtualizacao.unidade_medida = novosDados.unidade_medida;
+                if (novosDados.estado_conservacao) payloadAtualizacao.estado_conservacao = novosDados.estado_conservacao;
+                if (novosDados.destino_item) payloadAtualizacao.destino_item = novosDados.destino_item;
+            }
+
+            if (qtdLote <= 0) {
+                const { error: delErr } = await window.supabaseClient
+                    .from('doacoes_materiais')
+                    .delete()
+                    .eq('id_material', lote.id_material);
+                if (delErr) throw new Error(`Falha ao remover item zerado do estoque: ${delErr.message}`);
+                operacoesConcluidas.push({ tipo: 'delete', loteOriginal: lote });
+            } else {
+                const { error: updErr } = await window.supabaseClient
+                    .from('doacoes_materiais')
+                    .update(payloadAtualizacao)
+                    .eq('id_material', lote.id_material);
+                if (updErr) throw new Error(`Falha ao atualizar lote #${lote.id_material}: ${updErr.message}`);
+                operacoesConcluidas.push({ tipo: 'update', loteOriginal: lote });
+            }
         }
-
-        const payloadAtualizacao = {
-            quantidade: Math.round(qtdLote * 100) / 100
-        };
-
-        if (novosDados) {
-            if (novosDados.descricao_item) payloadAtualizacao.descricao_item = novosDados.descricao_item;
-            if (novosDados.id_categoria) payloadAtualizacao.id_categoria = Number(novosDados.id_categoria);
-            if (novosDados.unidade_medida) payloadAtualizacao.unidade_medida = novosDados.unidade_medida;
-            if (novosDados.estado_conservacao) payloadAtualizacao.estado_conservacao = novosDados.estado_conservacao;
-            if (novosDados.destino_item) payloadAtualizacao.destino_item = novosDados.destino_item;
+        return true;
+    } catch (errLoop) {
+        console.error("Erro na atualização consolidada. Executando compensação...", errLoop);
+        for (const op of operacoesConcluidas) {
+            try {
+                if (op.tipo === 'delete') {
+                    await window.supabaseClient.from('doacoes_materiais').insert([op.loteOriginal]);
+                } else if (op.tipo === 'update') {
+                    await window.supabaseClient.from('doacoes_materiais').update({ quantidade: op.loteOriginal.quantidade }).eq('id_material', op.loteOriginal.id_material);
+                }
+            } catch (errRollback) {
+                console.error("Falha ao reverter lote #", op.loteOriginal.id_material, errRollback);
+            }
         }
-
-        if (qtdLote <= 0) {
-            const { error: delErr } = await window.supabaseClient
-                .from('doacoes_materiais')
-                .delete()
-                .eq('id_material', lote.id_material);
-            if (delErr) throw new Error(`Falha ao remover item zerado do estoque: ${delErr.message}`);
-        } else {
-            const { error: updErr } = await window.supabaseClient
-                .from('doacoes_materiais')
-                .update(payloadAtualizacao)
-                .eq('id_material', lote.id_material);
-            if (updErr) throw new Error(`Falha ao atualizar lote #${lote.id_material}: ${updErr.message}`);
-        }
+        throw new Error(`Falha ao atualizar lotes: ${errLoop.message}. Modificações foram revertidas.`);
     }
-
-    return true;
 }
 
 window.estoqueService = {

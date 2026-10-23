@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged, onLoadingStart, onLoadingEnd }) {
+function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoacao, onDataChanged, onLoadingStart, onLoadingEnd }) {
     const { mostrarToast } = window.useToast();
 
     const [adminSubTab, setAdminSubTab] = useState('doadores');
@@ -24,13 +24,17 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
             const { count: doadoresCount } = await window.supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
             const { count: doacoesCount } = await window.supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
 
-            const { data: finData } = await window.supabaseClient.from('doacoes_financeiras').select('valor');
+            const { data: finData, error: finError } = await window.supabaseClient.from('doacoes_financeiras').select('valor');
+            if (finError) throw finError;
+
             const totalFin = finData ? finData.reduce((acc, r) => {
                 const val = window.sanitizarValorMonetario ? window.sanitizarValorMonetario(r.valor) : (parseFloat(r.valor) || 0);
                 return acc + val;
             }, 0) : 0;
 
-            const { data: matData } = await window.supabaseClient.from('doacoes_materiais').select('quantidade');
+            const { data: matData, error: matError } = await window.supabaseClient.from('doacoes_materiais').select('quantidade');
+            if (matError) throw matError;
+
             const totalMat = matData ? matData.reduce((acc, r) => {
                 const q = parseFloat(r.quantidade);
                 return acc + (isNaN(q) ? 0 : q);
@@ -38,7 +42,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
 
             setMetricDoadores(doadoresCount || 0);
             setMetricDoacoes(doacoesCount || 0);
-            setMetricFinanceiro(totalFin);
+            setMetricFinanceiro(Math.round(totalFin * 100) / 100);
             setMetricMateriais(Math.round(totalMat * 100) / 100);
         } catch (e) {
             console.error("Erro ao carregar métricas admin:", e);
@@ -71,7 +75,7 @@ function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged
         if (isVisible) {
             carregarDadosAdmin();
         }
-    }, [isVisible]);
+    }, [isVisible, refreshTrigger]);
 
     useEffect(() => {
         if (window.lucide) {

@@ -21,6 +21,7 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
     const [matUnidade, setMatUnidade] = useState('Unidade');
     const [matEstado, setMatEstado] = useState('Não se aplica');
     const [matDestino, setMatDestino] = useState('Estoque Geral');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (doacao) {
@@ -80,8 +81,10 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
             (d.email && d.email.toLowerCase().includes(query));
     });
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
         const valorFinLimpo = checkFinanceiro
             ? (window.sanitizarValorMonetario ? window.sanitizarValorMonetario(finValor) : (parseFloat(String(finValor).replace(',', '.')) || 0))
             : null;
@@ -89,22 +92,27 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
             ? (parseFloat(matQtd) || 1)
             : 1;
 
-        onSave({
-            idDoacao: parseInt(idDoacao, 10),
-            idDoador: parseInt(idDoador, 10),
-            canal,
-            observacoes: observacoes ? observacoes.trim() : null,
-            checkFinanceiro,
-            checkMaterial,
-            finValor: valorFinLimpo,
-            finComprovante: finComprovante ? finComprovante.trim() : null,
-            matDescricao: matDescricao ? matDescricao.trim() : '',
-            matCategoria: parseInt(matCategoria, 10) || null,
-            matQtd: Math.round(qtdMatLimpa * 100) / 100,
-            matUnidade,
-            matEstado,
-            matDestino
-        });
+        setIsSubmitting(true);
+        try {
+            await onSave({
+                idDoacao: parseInt(idDoacao, 10),
+                idDoador: parseInt(idDoador, 10),
+                canal,
+                observacoes: observacoes ? observacoes.trim() : null,
+                checkFinanceiro,
+                checkMaterial,
+                finValor: valorFinLimpo,
+                finComprovante: finComprovante ? finComprovante.trim() : null,
+                matDescricao: matDescricao ? matDescricao.trim() : '',
+                matCategoria: parseInt(matCategoria, 10) || null,
+                matQtd: Math.round(qtdMatLimpa * 100) / 100,
+                matUnidade,
+                matEstado,
+                matDestino
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const selecionarPreset = (tipo) => {
@@ -315,7 +323,8 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Quantidade *</label>
                                     <input
                                         type="number"
-                                        min="1"
+                                        min="0.01"
+                                        step="any"
                                         value={matQtd}
                                         onChange={(e) => setMatQtd(e.target.value)}
                                         required
@@ -378,9 +387,13 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20 transition cursor-pointer flex items-center gap-2"
+                            disabled={isSubmitting}
+                            className={`px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl shadow-md transition flex items-center gap-2 ${
+                                isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-700 cursor-pointer shadow-rose-600/20'
+                            }`}
                         >
-                            <i data-lucide="check" className="w-4 h-4"></i> Salvar Alterações
+                            <i data-lucide={isSubmitting ? "loader-2" : "check"} className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                            <span>{isSubmitting ? 'Salvando...' : 'Salvar Alterações'}</span>
                         </button>
                     </div>
                 </form>

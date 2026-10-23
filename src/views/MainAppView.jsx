@@ -17,6 +17,7 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
     const [activeTab, setActiveTab] = useState('doador');
     const [doadoresGlobal, setDoadoresGlobal] = useState([]);
     const [categoriasGlobal, setCategoriasGlobal] = useState([]);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const [editDoadorModalOpen, setEditDoadorModalOpen] = useState(false);
     const [selectedDoador, setSelectedDoador] = useState(null);
@@ -27,6 +28,11 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
     const [editEstoqueModalOpen, setEditEstoqueModalOpen] = useState(false);
     const [selectedEstoqueItem, setSelectedEstoqueItem] = useState(null);
     const [estoqueEditMode, setEstoqueEditMode] = useState('lote');
+
+    const triggerFullRefresh = () => {
+        carregarDadosApp();
+        setRefreshTrigger(prev => prev + 1);
+    };
 
     const carregarDadosApp = async () => {
         try {
@@ -53,7 +59,7 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
             await window.doadoresService.atualizarDoador(dados.id_doador, dados);
             mostrarToast('Doador atualizado com sucesso!', 'success');
             setEditDoadorModalOpen(false);
-            carregarDadosApp();
+            triggerFullRefresh();
         } catch (e) { mostrarToast('Erro ao atualizar doador: ' + e.message, 'error'); }
         finally { if (onLoadingEnd) onLoadingEnd(); }
     };
@@ -72,7 +78,7 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
             );
             mostrarToast('Doação atualizada com sucesso!', 'success');
             setEditDoacaoModalOpen(false);
-            carregarDadosApp();
+            triggerFullRefresh();
         } catch (e) { mostrarToast('Erro ao atualizar doação: ' + e.message, 'error'); }
         finally { if (onLoadingEnd) onLoadingEnd(); }
     };
@@ -103,7 +109,7 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
             }
             mostrarToast('Estoque atualizado com sucesso!', 'success');
             setEditEstoqueModalOpen(false);
-            carregarDadosApp();
+            triggerFullRefresh();
         } catch (e) { mostrarToast('Erro ao atualizar estoque: ' + e.message, 'error'); }
         finally { if (onLoadingEnd) onLoadingEnd(); }
     };
@@ -113,10 +119,10 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
             <Header />
             <Navbar activeTab={activeTab} onSwitchTab={setActiveTab} />
             <main className="pt-2">
-                <DoadorTab isVisible={activeTab === 'doador'} onDoadorCadastrado={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
-                <DoacaoMistaTab isVisible={activeTab === 'doacao_mista'} doadores={doadoresGlobal} categorias={categoriasGlobal} onDoacaoRegistrada={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
-                <AdminTab isVisible={activeTab === 'admin'} onOpenEditDoador={(d) => { setSelectedDoador(d); setEditDoadorModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onDataChanged={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
-                <EstoqueTab isVisible={activeTab === 'estoque'} onOpenEditEstoque={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('lote'); setEditEstoqueModalOpen(true); }} onOpenEditEstoqueConsolidado={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('consolidado'); setEditEstoqueModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                <DoadorTab isVisible={activeTab === 'doador'} onDoadorCadastrado={triggerFullRefresh} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                <DoacaoMistaTab isVisible={activeTab === 'doacao_mista'} doadores={doadoresGlobal} categorias={categoriasGlobal} onDoacaoRegistrada={triggerFullRefresh} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                <AdminTab isVisible={activeTab === 'admin'} refreshTrigger={refreshTrigger} onOpenEditDoador={(d) => { setSelectedDoador(d); setEditDoadorModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onDataChanged={triggerFullRefresh} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                <EstoqueTab isVisible={activeTab === 'estoque'} refreshTrigger={refreshTrigger} onOpenEditEstoque={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('lote'); setEditEstoqueModalOpen(true); }} onOpenEditEstoqueConsolidado={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('consolidado'); setEditEstoqueModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
             </main>
 
             <EditDoadorModal isOpen={editDoadorModalOpen} doador={selectedDoador} onClose={() => setEditDoadorModalOpen(false)} onSave={handleSaveDoador} />

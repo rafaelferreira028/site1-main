@@ -1,18 +1,18 @@
 // Utilitários de Formatação e Máscaras de Dados
 
 function formatarCPF(val) {
-    if (!val) return "";
-    val = val.replace(/\D/g, "").slice(0, 11);
-    return val
+    if (val === null || val === undefined || val === '') return "";
+    const str = String(val).replace(/\D/g, "").slice(0, 11);
+    return str
         .replace(/^(\d{3})(\d)/, "$1.$2")
         .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
         .replace(/\.(\d{3})(\d)/, ".$1-$2");
 }
 
 function formatarCNPJ(val) {
-    if (!val) return "";
-    val = val.replace(/\D/g, "").slice(0, 14);
-    return val
+    if (val === null || val === undefined || val === '') return "";
+    const str = String(val).replace(/\D/g, "").slice(0, 14);
+    return str
         .replace(/^(\d{2})(\d)/, "$1.$2")
         .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
         .replace(/\.(\d{3})(\d)/, ".$1/$2")
@@ -20,13 +20,13 @@ function formatarCNPJ(val) {
 }
 
 function formatarDocumento(val, tipo) {
-    if (!val) return "";
+    if (val === null || val === undefined || val === '') return "";
+    const clean = String(val).replace(/\D/g, "");
     if (tipo === 'PF') {
-        return formatarCPF(val);
+        return formatarCPF(clean);
     } else if (tipo === 'PJ') {
-        return formatarCNPJ(val);
+        return formatarCNPJ(clean);
     } else {
-        const clean = val.replace(/\D/g, "");
         if (clean.length > 11) {
             return formatarCNPJ(clean);
         } else {
@@ -36,14 +36,14 @@ function formatarDocumento(val, tipo) {
 }
 
 function formatarTelefone(val) {
-    if (!val) return "";
-    val = val.replace(/\D/g, "").slice(0, 11);
-    if (val.length > 10) {
-        return val
+    if (val === null || val === undefined || val === '') return "";
+    const str = String(val).replace(/\D/g, "").slice(0, 11);
+    if (str.length > 10) {
+        return str
             .replace(/^(\d{2})(\d)/, "($1) $2")
             .replace(/(\d{5})(\d)/, "$1-$2");
     } else {
-        return val
+        return str
             .replace(/^(\d{2})(\d)/, "($1) $2")
             .replace(/(\d{4})(\d)/, "$1-$2");
     }
@@ -96,8 +96,8 @@ function limitarAnoDataInput(input) {
 }
 
 function formatarCEP(val) {
-    if (!val) return "";
-    const v = val.replace(/\D/g, "").slice(0, 8);
+    if (val === null || val === undefined || val === '') return "";
+    const v = String(val).replace(/\D/g, "").slice(0, 8);
     if (v.length > 5) {
         return `${v.slice(0, 5)}-${v.slice(5)}`;
     }
@@ -106,11 +106,18 @@ function formatarCEP(val) {
 
 async function consultarCEP(cep) {
     if (!cep) return null;
-    const cepLimpo = cep.replace(/\D/g, '');
+    const cepLimpo = String(cep).replace(/\D/g, '');
     if (cepLimpo.length !== 8) return null;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     try {
-        const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+        const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         if (!response.ok) return { error: 'Não foi possível consultar o CEP.' };
         const data = await response.json();
         if (data.erro) {
@@ -130,14 +137,18 @@ async function consultarCEP(cep) {
             cidadeUf: cidadeUf
         };
     } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+            return { error: 'Tempo limite ao consultar CEP. Preencha manualmente.' };
+        }
         return { error: 'Erro ao buscar CEP. Verifique a conexão com a internet.' };
     }
 }
 
 // Utilitários de Mascaramento para Proteção de Dados Pessoais (LGPD / AppSec MED-01)
 function mascararDocumento(val, tipo) {
-    if (!val) return "";
-    const clean = val.replace(/\D/g, "");
+    if (val === null || val === undefined || val === '') return "";
+    const clean = String(val).replace(/\D/g, "");
     if (tipo === 'PF' || clean.length <= 11) {
         const cpf = formatarCPF(clean);
         return cpf.replace(/^(\d{3})\.(\d{3})\.(\d{3})-(\d{2})$/, "$1.***.***-$2");
@@ -148,7 +159,7 @@ function mascararDocumento(val, tipo) {
 }
 
 function mascararTelefone(val) {
-    if (!val) return "";
+    if (val === null || val === undefined || val === '') return "";
     const tel = formatarTelefone(val);
     // Mascara o meio do telefone: (11) 98765-4321 -> (11) 9****-4321
     return tel.replace(/^(\(\d{2}\)\s*\d)(\d{3,4})(-\d{4})$/, (match, p1, p2, p3) => {

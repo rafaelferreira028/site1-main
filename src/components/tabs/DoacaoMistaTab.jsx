@@ -389,7 +389,8 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
                                 <input
                                     type="number"
                                     id="mat-qtd"
-                                    min="1"
+                                    min="0.01"
+                                    step="any"
                                     value={matQtd}
                                     onChange={(e) => setMatQtd(e.target.value)}
                                     required

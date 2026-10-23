@@ -14,6 +14,7 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
     const [cidade, setCidade] = useState('');
     const [dataNascimento, setDataNascimento] = useState('');
     const [isBuscaCepLoading, setIsBuscaCepLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (doador) {
@@ -70,26 +71,33 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
         const nomeLimpo = nome ? nome.trim() : '';
         if (!nomeLimpo) {
             mostrarToast('Por favor, informe o nome ou razão social.', 'error');
             return;
         }
 
-        onSave({
-            id_doador: parseInt(idDoador, 10),
-            nome: nomeLimpo,
-            tipo_doador: tipoDoador,
-            documento: documento ? documento.trim() : null,
-            telefone: telefone ? telefone.trim() : null,
-            email: email ? email.trim() : null,
-            cep: cep ? cep.trim() : null,
-            endereco: endereco ? endereco.trim() : null,
-            cidade: cidade ? cidade.trim() : null,
-            data_nascimento: dataNascimento || null
-        });
+        setIsSubmitting(true);
+        try {
+            await onSave({
+                id_doador: parseInt(idDoador, 10),
+                nome: nomeLimpo,
+                tipo_doador: tipoDoador,
+                documento: documento ? documento.trim() : null,
+                telefone: telefone ? telefone.trim() : null,
+                email: email ? email.trim() : null,
+                cep: cep ? cep.trim() : null,
+                endereco: endereco ? endereco.trim() : null,
+                cidade: cidade ? cidade.trim() : null,
+                data_nascimento: dataNascimento || null
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -258,9 +266,13 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20 transition cursor-pointer flex items-center gap-2"
+                            disabled={isSubmitting}
+                            className={`px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl shadow-md transition flex items-center gap-2 ${
+                                isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-700 cursor-pointer shadow-rose-600/20'
+                            }`}
                         >
-                            <i data-lucide="check" className="w-4 h-4"></i> Salvar Alterações
+                            <i data-lucide={isSubmitting ? "loader-2" : "check"} className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                            <span>{isSubmitting ? 'Salvando...' : 'Salvar Alterações'}</span>
                         </button>
                     </div>
                 </form>

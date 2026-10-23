@@ -80,13 +80,13 @@ async function exportarPDFEstoqueOficial() {
                 destino: item.destino_item || 'Estoque Geral'
             };
         }
-        grupos[key].quantidade += parseQtd(item.quantidade);
+        grupos[key].quantidade = Math.round((grupos[key].quantidade + parseQtd(item.quantidade)) * 100) / 100;
     });
 
     const tableRows = Object.values(grupos).map((g, index) => [
         index + 1,
         g.categoria,
-        g.quantidade,
+        Number(g.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
         g.unidade,
         g.destino
     ]);

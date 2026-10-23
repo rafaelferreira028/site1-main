@@ -7,7 +7,7 @@
     <title>Rede de Combate ao Câncer - Sistema de Doações e Estoque</title>
 
     <!-- Meta Tags de Segurança (MED-02, MED-03) -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://viacep.com.br; img-src 'self' data: https:; font-src 'self' data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; connect-src 'self' https://*.supabase.co https://viacep.com.br; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com;">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-Frame-Options" content="DENY">
     <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -17,9 +17,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="./styles/main.css">
 
-    <!-- Dependências e SDKs Externos com Versões Fixas e Crossorigin -->
+    <!-- Dependências e SDKs Externos com Versões Funcionais e Fallback -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        // Fallback automático caso a unpkg oscile
+        if (!window.lucide) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"><\/script>');
+        }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
 
@@ -51,18 +57,18 @@
         const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
         function formatarCPF(val) {
-            if (!val) return "";
-            val = val.replace(/\D/g, "").slice(0, 11);
-            return val
+            if (val === null || val === undefined || val === '') return "";
+            const str = String(val).replace(/\D/g, "").slice(0, 11);
+            return str
                 .replace(/^(\d{3})(\d)/, "$1.$2")
                 .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
                 .replace(/\.(\d{3})(\d)/, ".$1-$2");
         }
 
         function formatarCNPJ(val) {
-            if (!val) return "";
-            val = val.replace(/\D/g, "").slice(0, 14);
-            return val
+            if (val === null || val === undefined || val === '') return "";
+            const str = String(val).replace(/\D/g, "").slice(0, 14);
+            return str
                 .replace(/^(\d{2})(\d)/, "$1.$2")
                 .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
                 .replace(/\.(\d{3})(\d)/, ".$1/$2")
@@ -70,20 +76,20 @@
         }
 
         function formatarDocumento(val, tipo) {
-            if (!val) return "";
-            if (tipo === 'PF') return formatarCPF(val);
-            if (tipo === 'PJ') return formatarCNPJ(val);
-            const clean = val.replace(/\D/g, "");
+            if (val === null || val === undefined || val === '') return "";
+            const clean = String(val).replace(/\D/g, "");
+            if (tipo === 'PF') return formatarCPF(clean);
+            if (tipo === 'PJ') return formatarCNPJ(clean);
             return clean.length > 11 ? formatarCNPJ(clean) : formatarCPF(clean);
         }
 
         function formatarTelefone(val) {
-            if (!val) return "";
-            val = val.replace(/\D/g, "").slice(0, 11);
-            if (val.length > 10) {
-                return val.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+            if (val === null || val === undefined || val === '') return "";
+            const str = String(val).replace(/\D/g, "").slice(0, 11);
+            if (str.length > 10) {
+                return str.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
             } else {
-                return val.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+                return str.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
             }
         }
 
@@ -124,8 +130,8 @@
         }
 
         function formatarCEP(val) {
-            if (!val) return "";
-            const v = val.replace(/\D/g, "").slice(0, 8);
+            if (val === null || val === undefined || val === '') return "";
+            const v = String(val).replace(/\D/g, "").slice(0, 8);
             if (v.length > 5) {
                 return `${v.slice(0, 5)}-${v.slice(5)}`;
             }
@@ -134,11 +140,18 @@
 
         async function consultarCEP(cep) {
             if (!cep) return null;
-            const cepLimpo = cep.replace(/\D/g, '');
+            const cepLimpo = String(cep).replace(/\D/g, '');
             if (cepLimpo.length !== 8) return null;
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+
             try {
-                const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+                const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
                 if (!response.ok) return { error: 'Não foi possível consultar o CEP.' };
                 const data = await response.json();
                 if (data.erro) {
@@ -158,6 +171,10 @@
                     cidadeUf: cidadeUf
                 };
             } catch (err) {
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') {
+                    return { error: 'Tempo limite ao consultar CEP. Preencha manualmente.' };
+                }
                 return { error: 'Erro ao buscar CEP.' };
             }
         }
@@ -166,8 +183,8 @@
         // Utilitários de Mascaramento para Proteção de Dados Pessoais (MED-01)
         // ==========================================
         function mascararDocumento(val, tipo) {
-            if (!val) return "";
-            const clean = val.replace(/\D/g, "");
+            if (val === null || val === undefined || val === '') return "";
+            const clean = String(val).replace(/\D/g, "");
             if (tipo === 'PF' || clean.length <= 11) {
                 const cpf = formatarCPF(clean);
                 return cpf.replace(/^(\d{3})\.(\d{3})\.(\d{3})-(\d{2})$/, "$1.***.***-$2");
@@ -405,48 +422,66 @@
                 }
 
                 let diferencaRestante = diferencaNum;
+                const operacoesConcluidas = [];
 
-                for (const lote of lotes) {
-                    const quantidadeAtual = parseFloat(lote.quantidade) || 0;
-                    let qtdLote = quantidadeAtual;
+                try {
+                    for (const lote of lotes) {
+                        const quantidadeAtual = parseFloat(lote.quantidade) || 0;
+                        let qtdLote = quantidadeAtual;
 
-                    if (diferencaRestante > 0) {
-                        qtdLote += diferencaRestante;
-                        diferencaRestante = 0;
-                    } else if (diferencaRestante < 0) {
-                        const reducao = Math.min(quantidadeAtual, -diferencaRestante);
-                        qtdLote -= reducao;
-                        diferencaRestante += reducao;
+                        if (diferencaRestante > 0) {
+                            qtdLote += diferencaRestante;
+                            diferencaRestante = 0;
+                        } else if (diferencaRestante < 0) {
+                            const reducao = Math.min(quantidadeAtual, -diferencaRestante);
+                            qtdLote -= reducao;
+                            diferencaRestante += reducao;
+                        }
+
+                        const payloadAtualizacao = {
+                            quantidade: Math.round(qtdLote * 100) / 100
+                        };
+
+                        if (novosDados) {
+                            if (novosDados.descricao_item) payloadAtualizacao.descricao_item = novosDados.descricao_item;
+                            if (novosDados.id_categoria) payloadAtualizacao.id_categoria = Number(novosDados.id_categoria);
+                            if (novosDados.unidade_medida) payloadAtualizacao.unidade_medida = novosDados.unidade_medida;
+                            if (novosDados.estado_conservacao) payloadAtualizacao.estado_conservacao = novosDados.estado_conservacao;
+                            if (novosDados.destino_item) payloadAtualizacao.destino_item = novosDados.destino_item;
+                        }
+
+                        if (qtdLote <= 0) {
+                            const { error: delErr } = await supabaseClient
+                                .from('doacoes_materiais')
+                                .delete()
+                                .eq('id_material', lote.id_material);
+                            if (delErr) throw new Error(`Falha ao remover item zerado do estoque: ${delErr.message}`);
+                            operacoesConcluidas.push({ tipo: 'delete', loteOriginal: lote });
+                        } else {
+                            const { error: updErr } = await supabaseClient
+                                .from('doacoes_materiais')
+                                .update(payloadAtualizacao)
+                                .eq('id_material', lote.id_material);
+                            if (updErr) throw new Error(`Falha ao atualizar lote #${lote.id_material}: ${updErr.message}`);
+                            operacoesConcluidas.push({ tipo: 'update', loteOriginal: lote });
+                        }
                     }
-
-                    const payloadAtualizacao = {
-                        quantidade: Math.round(qtdLote * 100) / 100
-                    };
-
-                    if (novosDados) {
-                        if (novosDados.descricao_item) payloadAtualizacao.descricao_item = novosDados.descricao_item;
-                        if (novosDados.id_categoria) payloadAtualizacao.id_categoria = Number(novosDados.id_categoria);
-                        if (novosDados.unidade_medida) payloadAtualizacao.unidade_medida = novosDados.unidade_medida;
-                        if (novosDados.estado_conservacao) payloadAtualizacao.estado_conservacao = novosDados.estado_conservacao;
-                        if (novosDados.destino_item) payloadAtualizacao.destino_item = novosDados.destino_item;
+                    return true;
+                } catch (errLoop) {
+                    console.error("Erro na atualização consolidada. Executando compensação...", errLoop);
+                    for (const op of operacoesConcluidas) {
+                        try {
+                            if (op.tipo === 'delete') {
+                                await supabaseClient.from('doacoes_materiais').insert([op.loteOriginal]);
+                            } else if (op.tipo === 'update') {
+                                await supabaseClient.from('doacoes_materiais').update({ quantidade: op.loteOriginal.quantidade }).eq('id_material', op.loteOriginal.id_material);
+                            }
+                        } catch (errRollback) {
+                            console.error("Falha ao reverter lote #", op.loteOriginal.id_material, errRollback);
+                        }
                     }
-
-                    if (qtdLote <= 0) {
-                        const { error: delErr } = await supabaseClient
-                            .from('doacoes_materiais')
-                            .delete()
-                            .eq('id_material', lote.id_material);
-                        if (delErr) throw new Error(`Falha ao remover item zerado do estoque: ${delErr.message}`);
-                    } else {
-                        const { error: updErr } = await supabaseClient
-                            .from('doacoes_materiais')
-                            .update(payloadAtualizacao)
-                            .eq('id_material', lote.id_material);
-                        if (updErr) throw new Error(`Falha ao atualizar lote #${lote.id_material}: ${updErr.message}`);
-                    }
+                    throw new Error(`Falha ao atualizar lotes: ${errLoop.message}. Modificações foram revertidas.`);
                 }
-
-                return true;
             }
         };
 
@@ -511,11 +546,11 @@
                             destino: item.destino_item || 'Estoque Geral'
                         };
                     }
-                    grupos[key].quantidade += parseQtdPdf(item.quantidade);
+                    grupos[key].quantidade = Math.round((grupos[key].quantidade + parseQtdPdf(item.quantidade)) * 100) / 100;
                 });
 
                 const tableRows = Object.values(grupos).map((g, index) => [
-                    index + 1, g.categoria, g.quantidade, g.unidade, g.destino
+                    index + 1, g.categoria, Number(g.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }), g.unidade, g.destino
                 ]);
 
                 doc.autoTable({
@@ -829,18 +864,39 @@
         const ToastContext = createContext();
         function ToastProvider({ children }) {
             const [toasts, setToasts] = useState([]);
+            const timersRef = useRef(new Map());
+
+            const limparTimer = (id) => {
+                if (timersRef.current.has(id)) {
+                    clearTimeout(timersRef.current.get(id));
+                    timersRef.current.delete(id);
+                }
+            };
+
+            const removerToast = (id) => {
+                limparTimer(id);
+                setToasts(prev => prev.map(t => t.id === id ? { ...t, isExiting: true } : t));
+                const exitTimer = setTimeout(() => {
+                    setToasts(prev => prev.filter(t => t.id !== id));
+                    timersRef.current.delete(`exit_${id}`);
+                }, 300);
+                timersRef.current.set(`exit_${id}`, exitTimer);
+            };
 
             const mostrarToast = (mensagem, tipo = 'success') => {
                 const id = Date.now() + Math.random();
                 const newToast = { id, mensagem, tipo, isExiting: false };
                 setToasts(prev => [...prev, newToast]);
-                setTimeout(() => removerToast(id), 4000);
+                const autoTimer = setTimeout(() => removerToast(id), 4000);
+                timersRef.current.set(id, autoTimer);
             };
 
-            const removerToast = (id) => {
-                setToasts(prev => prev.map(t => t.id === id ? { ...t, isExiting: true } : t));
-                setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 300);
-            };
+            useEffect(() => {
+                return () => {
+                    timersRef.current.forEach(timerId => clearTimeout(timerId));
+                    timersRef.current.clear();
+                };
+            }, []);
 
             return (
                 <ToastContext.Provider value={{ toasts, mostrarToast, removerToast }}>
@@ -1015,6 +1071,8 @@
                 }
             }, [doador]);
 
+            const [isSubmitting, setIsSubmitting] = useState(false);
+
             useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isOpen, tipoDoador, isBuscaCepLoading]);
 
             if (!isOpen) return null;
@@ -1024,7 +1082,7 @@
                 const formatado = formatarCEP(valor);
                 setCep(formatado);
 
-                const cepDigitos = valor.replace(/\D/g, '');
+                const cepDigitos = String(valor).replace(/\D/g, '');
                 if (cepDigitos.length === 8) {
                     setIsBuscaCepLoading(true);
                     const res = await consultarCEP(cepDigitos);
@@ -1041,9 +1099,33 @@
                 }
             };
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
-                onSave({ id_doador: parseInt(idDoador), nome, tipo_doador: tipoDoador, documento: documento || null, telefone: telefone || null, email: email || null, cep: cep || null, endereco: endereco || null, cidade: cidade || null, data_nascimento: dataNascimento || null });
+                if (isSubmitting) return;
+
+                const nomeLimpo = nome ? nome.trim() : '';
+                if (!nomeLimpo) {
+                    mostrarToast('Por favor, informe o nome ou razão social.', 'error');
+                    return;
+                }
+
+                setIsSubmitting(true);
+                try {
+                    await onSave({
+                        id_doador: parseInt(idDoador, 10),
+                        nome: nomeLimpo,
+                        tipo_doador: tipoDoador,
+                        documento: documento ? documento.trim() : null,
+                        telefone: telefone ? telefone.trim() : null,
+                        email: email ? email.trim() : null,
+                        cep: cep ? cep.trim() : null,
+                        endereco: endereco ? endereco.trim() : null,
+                        cidade: cidade ? cidade.trim() : null,
+                        data_nascimento: dataNascimento || null
+                    });
+                } finally {
+                    setIsSubmitting(false);
+                }
             };
 
             return (
@@ -1083,7 +1165,10 @@
                             </div>
                             <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                                 <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold rounded-xl text-gray-600 hover:bg-gray-100 transition cursor-pointer">Cancelar</button>
-                                <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md cursor-pointer flex items-center gap-2"><i data-lucide="check" className="w-4 h-4"></i> Salvar</button>
+                                <button type="submit" disabled={isSubmitting} className={`px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl shadow-md cursor-pointer flex items-center gap-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-700'}`}>
+                                    <i data-lucide={isSubmitting ? "loader-2" : "check"} className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                                    <span>{isSubmitting ? 'Salvando...' : 'Salvar Alterações'}</span>
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -1108,6 +1193,7 @@
             const [matUnidade, setMatUnidade] = useState('Unidade');
             const [matEstado, setMatEstado] = useState('Não se aplica');
             const [matDestino, setMatDestino] = useState('Estoque Geral');
+            const [isSubmitting, setIsSubmitting] = useState(false);
 
             useEffect(() => {
                 if (doacao) {
@@ -1153,13 +1239,23 @@
                 return !q || d.nome.toLowerCase().includes(q) || (d.documento && d.documento.includes(q));
             });
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
-                onSave({
-                    idDoacao: parseInt(idDoacao), idDoador: parseInt(idDoador), canal, observacoes, checkFinanceiro, checkMaterial,
-                    finValor: parseFloat(finValor), finComprovante, matDescricao, matCategoria: parseInt(matCategoria),
-                    matQtd: parseInt(matQtd), matUnidade, matEstado, matDestino
-                });
+                if (isSubmitting) return;
+
+                const valFinLimpo = sanitizarValorMonetario(finValor);
+                const qtdMatLimpa = parseFloat(String(matQtd).replace(',', '.')) || 0;
+
+                setIsSubmitting(true);
+                try {
+                    await onSave({
+                        idDoacao: parseInt(idDoacao, 10), idDoador: parseInt(idDoador, 10), canal, observacoes, checkFinanceiro, checkMaterial,
+                        finValor: valFinLimpo, finComprovante, matDescricao, matCategoria: parseInt(matCategoria, 10),
+                        matQtd: Math.round(qtdMatLimpa * 100) / 100, matUnidade, matEstado, matDestino
+                    });
+                } finally {
+                    setIsSubmitting(false);
+                }
             };
 
             return (
@@ -1197,7 +1293,7 @@
                             </div>
                             {checkFinanceiro && (
                                 <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label><input type="number" step="0.01" value={finValor} onChange={(e) => setFinValor(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Valor (R$) *</label><input type="number" step="any" min="0.01" value={finValor} onChange={(e) => setFinValor(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                                     <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nº Comprovante</label><input type="text" value={finComprovante} onChange={(e) => setFinComprovante(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                                 </div>
                             )}
@@ -1208,14 +1304,17 @@
                                         <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={matCategoria} onChange={(e) => setMatCategoria(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd *</label><input type="number" min="1" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd *</label><input type="number" min="0.01" step="any" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                                         <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={matDestino} onChange={(e) => setMatDestino(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
                                     </div>
                                 </div>
                             )}
                             <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                                 <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-gray-600">Cancelar</button>
-                                <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl">Salvar Alterações</button>
+                                <button type="submit" disabled={isSubmitting} className={`px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl flex items-center gap-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-700'}`}>
+                                    <i data-lucide={isSubmitting ? "loader-2" : "check"} className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                                    <span>{isSubmitting ? 'Salvando...' : 'Salvar Alterações'}</span>
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -1231,6 +1330,7 @@
             const [unidade, setUnidade] = useState('Unidade');
             const [estado, setEstado] = useState('Novo');
             const [destino, setDestino] = useState('Estoque Geral');
+            const [isSubmitting, setIsSubmitting] = useState(false);
 
             useEffect(() => {
                 if (item) {
@@ -1246,9 +1346,20 @@
 
             if (!isOpen) return null;
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
-                onSave({ idMaterial: parseInt(idMaterial), modo, grupoKey, novaDesc: descricao, novaCat: parseInt(categoria), novaQtd: parseInt(quantidade), novaUnidade: unidade, novoEstado: estado, novoDestino: destino });
+                if (isSubmitting) return;
+
+                const qtdNum = parseFloat(String(quantidade).replace(',', '.'));
+                setIsSubmitting(true);
+                try {
+                    await onSave({
+                        idMaterial: parseInt(idMaterial, 10), modo, grupoKey, novaDesc: descricao, novaCat: parseInt(categoria, 10),
+                        novaQtd: isNaN(qtdNum) || qtdNum < 0 ? 0 : Math.round(qtdNum * 100) / 100, novaUnidade: unidade, novoEstado: estado, novoDestino: destino
+                    });
+                } finally {
+                    setIsSubmitting(false);
+                }
             };
 
             return (
@@ -1267,7 +1378,7 @@
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Novo total da categoria *</label>
-                                        <input type="number" min="0" step="1" autoFocus value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono focus:border-rose-500" />
+                                        <input type="number" min="0" step="any" autoFocus value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono focus:border-rose-500" />
                                     </div>
                                     <p className="text-xs text-gray-500">O total será aplicado aos lotes desta categoria. Para alterar o destino, edite o lote correspondente.</p>
                                 </>
@@ -1275,7 +1386,7 @@
                             <div className={modo === 'consolidado' ? 'hidden' : ''}><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Descrição Item *</label><input type="text" value={descricao} onChange={(e) => setDescricao(e.target.value)} required disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm" /></div>
                             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${modo === 'consolidado' ? 'hidden' : ''}`}>
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
-                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd Total *</label><input type="number" min="0" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd Total *</label><input type="number" min="0" step="any" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                             </div>
                             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${modo === 'consolidado' ? 'hidden' : ''}`}>
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade *</label><select value={unidade} onChange={(e) => setUnidade(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Pacote">Pacote (pct)</option></select></div>
@@ -1283,7 +1394,10 @@
                             </div>
                             <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                                 <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-gray-600">Cancelar</button>
-                                <button type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl">Salvar Alterações</button>
+                                <button type="submit" disabled={isSubmitting} className={`px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl flex items-center gap-2 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-700'}`}>
+                                    <i data-lucide={isSubmitting ? "loader-2" : "check"} className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                                    <span>{isSubmitting ? 'Salvando...' : 'Salvar Alterações'}</span>
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -1400,6 +1514,7 @@
             const [matUnidade, setMatUnidade] = useState('Unidade');
             const [matEstado, setMatEstado] = useState('Não se aplica');
             const [matDestino, setMatDestino] = useState('Estoque Geral');
+            const [isSubmitting, setIsSubmitting] = useState(false);
 
             const searchContainerRef = useRef(null);
 
@@ -1449,12 +1564,15 @@
                 setCheckMaterial(false); setMatDescricao('');
                 setMatCategoria(categorias[0] ? categorias[0].id_categoria : '');
                 setMatQtd(1); setMatUnidade('Unidade'); setMatEstado('Não se aplica'); setMatDestino('Estoque Geral');
+                setIsSubmitting(false);
             };
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
+                if (isSubmitting) return;
                 if (!checkFinanceiro && !checkMaterial) { mostrarToast('Marque pelo menos uma opção (Financeira ou Material).', 'error'); return; }
                 if (!idDoador) { mostrarToast('Selecione um doador válido da lista.', 'error'); return; }
+                setIsSubmitting(true);
                 if (onLoadingStart) onLoadingStart();
                 let idDoacaoGerado = null;
                 try {
@@ -1467,7 +1585,9 @@
                         if (error) throw error;
                     }
                     if (checkMaterial) {
-                        const { error } = await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: parseInt(matCategoria), descricao_item: matDescricao, quantidade: parseInt(matQtd), unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
+                        const qtdLimpa = parseFloat(matQtd);
+                        if (isNaN(qtdLimpa) || qtdLimpa <= 0) { throw new Error('Informe uma quantidade de material válida maior que zero.'); }
+                        const { error } = await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: parseInt(matCategoria), descricao_item: matDescricao, quantidade: Math.round(qtdLimpa * 100) / 100, unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
                         if (error) throw error;
                     }
 
@@ -1481,7 +1601,10 @@
                     }
                     mostrarToast('Erro ao criar doação: ' + err.message, 'error');
                 }
-                finally { if (onLoadingEnd) onLoadingEnd(); }
+                finally {
+                    setIsSubmitting(false);
+                    if (onLoadingEnd) onLoadingEnd();
+                }
             };
 
             return (
@@ -1553,7 +1676,7 @@
                                     <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoria *</label><select value={matCategoria} onChange={(e) => setMatCategoria(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">{categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nome_categoria}</option>)}</select></div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Quantidade *</label><input type="number" min="1" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                    <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Quantidade *</label><input type="number" min="0.01" step="any" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                                     <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade de Medida *</label><select value={matUnidade} onChange={(e) => setMatUnidade(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Pacote">Pacote (pct)</option><option value="Caixa">Caixa (cx)</option><option value="Litro">Litro (l)</option></select></div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1562,13 +1685,13 @@
                                 </div>
                             </div>
                         )}
-                        <div className="pt-4 flex justify-end"><button type="submit" className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2"><i data-lucide="check-circle" className="w-5 h-5"></i> Registrar Doação Completa</button></div>
+                        <div className="pt-4 flex justify-end"><button type="submit" disabled={isSubmitting} className="bg-rose-600 text-white font-bold px-6 py-3 rounded-xl shadow-md hover:bg-rose-700 transition cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><i data-lucide="check-circle" className="w-5 h-5"></i> {isSubmitting ? 'Registrando...' : 'Registrar Doação Completa'}</button></div>
                     </form>
                 </div>
             );
         }
 
-        function AdminTab({ isVisible, onOpenEditDoador, onOpenEditDoacao, onDataChanged, onLoadingStart, onLoadingEnd }) {
+        function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoacao, onDataChanged, onLoadingStart, onLoadingEnd }) {
             const { mostrarToast } = useToast();
             const [adminSubTab, setAdminSubTab] = useState('doadores');
             const [searchQuery, setSearchQuery] = useState('');
@@ -1587,18 +1710,25 @@
             const carregarMetricas = async () => {
                 if (!supabaseClient) return;
                 try {
-                    const { count: doadoresCount } = await supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
-                    const { count: doacoesCount } = await supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
-                    const { data: finData } = await supabaseClient.from('doacoes_financeiras').select('valor');
-                    const totalFin = finData ? finData.reduce((acc, r) => acc + parseFloat(r.valor || 0), 0) : 0;
-                    const { data: matData } = await supabaseClient.from('doacoes_materiais').select('quantidade');
-                    const totalMat = matData ? matData.reduce((acc, r) => acc + parseInt(r.quantidade || 0), 0) : 0;
+                    const { count: doadoresCount, error: errDoadores } = await supabaseClient.from('doadores').select('*', { count: 'exact', head: true });
+                    if (errDoadores) throw errDoadores;
+                    const { count: doacoesCount, error: errDoacoes } = await supabaseClient.from('doacoes').select('*', { count: 'exact', head: true });
+                    if (errDoacoes) throw errDoacoes;
+                    const { data: finData, error: errFin } = await supabaseClient.from('doacoes_financeiras').select('valor');
+                    if (errFin) throw errFin;
+                    const totalFin = finData ? finData.reduce((acc, r) => acc + (parseFloat(r.valor) || 0), 0) : 0;
+                    const { data: matData, error: errMat } = await supabaseClient.from('doacoes_materiais').select('quantidade');
+                    if (errMat) throw errMat;
+                    const totalMat = matData ? matData.reduce((acc, r) => acc + (parseFloat(r.quantidade) || 0), 0) : 0;
 
                     setMetricDoadores(doadoresCount || 0);
                     setMetricDoacoes(doacoesCount || 0);
-                    setMetricFinanceiro(totalFin);
-                    setMetricMateriais(totalMat);
-                } catch (e) { console.error(e); }
+                    setMetricFinanceiro(Math.round(totalFin * 100) / 100);
+                    setMetricMateriais(Math.round(totalMat * 100) / 100);
+                } catch (e) {
+                    console.error('Erro ao carregar métricas:', e);
+                    mostrarToast('Não foi possível carregar as métricas do painel.', 'error');
+                }
             };
 
             const carregarDadosAdmin = async () => {
@@ -1618,7 +1748,7 @@
                 }
             };
 
-            useEffect(() => { if (isVisible) carregarDadosAdmin(); }, [isVisible]);
+            useEffect(() => { if (isVisible) carregarDadosAdmin(); }, [isVisible, refreshTrigger]);
             useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, searchQuery, loadingData, expandedDoadorId, paginaDoacoes]);
             useEffect(() => { setPaginaDoacoes(1); }, [searchQuery, adminSubTab]);
             if (!isVisible) return null;
@@ -1913,7 +2043,7 @@
             );
         }
 
-        function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
+        function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
             const { mostrarToast } = useToast();
             const [estoqueSubTab, setEstoqueSubTab] = useState('Geral');
             const [modoVisao, setModoVisao] = useState('consolidado');
@@ -1935,15 +2065,23 @@
                     const { data: doaData } = await estoqueService.buscarEstoqueDoacoesCanais();
                     setEstoqueDoacoesList(doaData || []);
 
-                    setTotalBazar(listMat.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
-                    setTotalAlimentos(listMat.filter(m => m.id_categoria === 2).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
-                    setTotalHigiene(listMat.filter(m => m.id_categoria === 3).reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
-                    setTotalItens(listMat.reduce((acc, item) => acc + parseInt(item.quantidade || 0), 0));
-                } catch (e) { console.error(e); }
+                    const bazarSum = listMat.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar')).reduce((acc, item) => acc + (parseFloat(item.quantidade) || 0), 0);
+                    const alimentosSum = listMat.filter(m => m.id_categoria === 2).reduce((acc, item) => acc + (parseFloat(item.quantidade) || 0), 0);
+                    const higieneSum = listMat.filter(m => m.id_categoria === 3).reduce((acc, item) => acc + (parseFloat(item.quantidade) || 0), 0);
+                    const totalSum = listMat.reduce((acc, item) => acc + (parseFloat(item.quantidade) || 0), 0);
+
+                    setTotalBazar(Math.round(bazarSum * 100) / 100);
+                    setTotalAlimentos(Math.round(alimentosSum * 100) / 100);
+                    setTotalHigiene(Math.round(higieneSum * 100) / 100);
+                    setTotalItens(Math.round(totalSum * 100) / 100);
+                } catch (e) {
+                    console.error('Erro ao carregar estoque:', e);
+                    mostrarToast('Erro ao carregar estoque: ' + e.message, 'error');
+                }
                 finally { if (onLoadingEnd) onLoadingEnd(); }
             };
 
-            useEffect(() => { if (isVisible) carregarEstoque(); }, [isVisible]);
+            useEffect(() => { if (isVisible) carregarEstoque(); }, [isVisible, refreshTrigger]);
             useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueSubTab, modoVisao, searchQuery, estoqueList]);
             if (!isVisible) return null;
 
@@ -1979,7 +2117,7 @@
                     if (!gruposConsolidados[key]) {
                         gruposConsolidados[key] = { key, descricao: categoria, quantidadeTotal: 0, unidade: 'Itens', destino: item.destino_item || 'Estoque Geral', lotes: [] };
                     }
-                    gruposConsolidados[key].quantidadeTotal += parseInt(item.quantidade || 0);
+                    gruposConsolidados[key].quantidadeTotal = Math.round((gruposConsolidados[key].quantidadeTotal + (parseFloat(item.quantidade) || 0)) * 100) / 100;
                     gruposConsolidados[key].lotes.push(item);
                 });
             }
@@ -2179,6 +2317,12 @@
             const [editEstoqueModalOpen, setEditEstoqueModalOpen] = useState(false);
             const [selectedEstoqueItem, setSelectedEstoqueItem] = useState(null);
             const [estoqueEditMode, setEstoqueEditMode] = useState('lote');
+            const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+            const triggerFullRefresh = () => {
+                setRefreshTrigger(prev => prev + 1);
+                carregarDadosApp();
+            };
 
             const carregarDadosApp = async () => {
                 try {
@@ -2198,7 +2342,7 @@
                     await doadoresService.atualizarDoador(dados.id_doador, dados);
                     mostrarToast('Doador atualizado com sucesso!', 'success');
                     setEditDoadorModalOpen(false);
-                    carregarDadosApp();
+                    triggerFullRefresh();
                 } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
                 finally { if (onLoadingEnd) onLoadingEnd(); }
             };
@@ -2209,7 +2353,7 @@
                     await doacoesService.atualizarDoacaoCompleta(payload.idDoacao, { id_doador: payload.idDoador, canal_recebimento: payload.canal, observacoes: payload.observacoes || null }, { id_doacao: payload.idDoacao, valor: payload.finValor, comprovante_transacao: payload.finComprovante || null }, { id_doacao: payload.idDoacao, id_categoria: payload.matCategoria, descricao_item: payload.matDescricao, quantidade: payload.matQtd, unidade_medida: payload.matUnidade, estado_conservacao: payload.matEstado, destino_item: payload.matDestino }, payload.checkFinanceiro, payload.checkMaterial, selectedDoacao);
                     mostrarToast('Doação atualizada com sucesso!', 'success');
                     setEditDoacaoModalOpen(false);
-                    carregarDadosApp();
+                    triggerFullRefresh();
                 } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
                 finally { if (onLoadingEnd) onLoadingEnd(); }
             };
@@ -2227,7 +2371,7 @@
                     }
                     mostrarToast('Estoque atualizado com sucesso!', 'success');
                     setEditEstoqueModalOpen(false);
-                    carregarDadosApp();
+                    triggerFullRefresh();
                 } catch (e) { mostrarToast('Erro: ' + e.message, 'error'); }
                 finally { if (onLoadingEnd) onLoadingEnd(); }
             };
@@ -2237,15 +2381,15 @@
                     <Header />
                     <Navbar activeTab={activeTab} onSwitchTab={setActiveTab} />
                     <main className="pt-2">
-                        <DoadorTab isVisible={activeTab === 'doador'} onDoadorCadastrado={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
-                        <DoacaoMistaTab isVisible={activeTab === 'doacao_mista'} doadores={doadoresGlobal} categorias={categoriasGlobal} onDoacaoRegistrada={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
-                        <AdminTab isVisible={activeTab === 'admin'} onOpenEditDoador={(d) => { setSelectedDoador(d); setEditDoadorModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onDataChanged={carregarDadosApp} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
-                <EstoqueTab isVisible={activeTab === 'estoque'} onOpenEditEstoque={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('lote'); setEditEstoqueModalOpen(true); }} onOpenEditEstoqueConsolidado={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('consolidado'); setEditEstoqueModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                        <DoadorTab isVisible={activeTab === 'doador'} onDoadorCadastrado={triggerFullRefresh} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                        <DoacaoMistaTab isVisible={activeTab === 'doacao_mista'} doadores={doadoresGlobal} categorias={categoriasGlobal} onDoacaoRegistrada={triggerFullRefresh} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                        <AdminTab isVisible={activeTab === 'admin'} refreshTrigger={refreshTrigger} onOpenEditDoador={(d) => { setSelectedDoador(d); setEditDoadorModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onDataChanged={triggerFullRefresh} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
+                        <EstoqueTab isVisible={activeTab === 'estoque'} refreshTrigger={refreshTrigger} onOpenEditEstoque={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('lote'); setEditEstoqueModalOpen(true); }} onOpenEditEstoqueConsolidado={(m) => { setSelectedEstoqueItem(m); setEstoqueEditMode('consolidado'); setEditEstoqueModalOpen(true); }} onOpenEditDoacao={(d) => { setSelectedDoacao(d); setEditDoacaoModalOpen(true); }} onLoadingStart={onLoadingStart} onLoadingEnd={onLoadingEnd} />
                     </main>
 
                     <EditDoadorModal isOpen={editDoadorModalOpen} doador={selectedDoador} onClose={() => setEditDoadorModalOpen(false)} onSave={handleSaveDoador} />
                     <EditDoacaoModal isOpen={editDoacaoModalOpen} doacao={selectedDoacao} doadores={doadoresGlobal} categorias={categoriasGlobal} onClose={() => setEditDoacaoModalOpen(false)} onSave={handleSaveDoacao} />
-                <EditEstoqueModal isOpen={editEstoqueModalOpen} item={selectedEstoqueItem} modo={estoqueEditMode} categorias={categoriasGlobal} onClose={() => setEditEstoqueModalOpen(false)} onSave={handleSaveEstoque} />
+                    <EditEstoqueModal isOpen={editEstoqueModalOpen} item={selectedEstoqueItem} modo={estoqueEditMode} categorias={categoriasGlobal} onClose={() => setEditEstoqueModalOpen(false)} onSave={handleSaveEstoque} />
                 </div>
             );
         }

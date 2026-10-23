@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
+function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEstoqueConsolidado, onOpenEditDoacao, onLoadingStart, onLoadingEnd }) {
     const { mostrarToast } = window.useToast();
 
     const [estoqueSubTab, setEstoqueSubTab] = useState('Geral');
@@ -58,7 +58,7 @@ function EstoqueTab({ isVisible, onOpenEditEstoque, onOpenEditEstoqueConsolidado
         if (isVisible) {
             carregarDadosEstoque();
         }
-    }, [isVisible]);
+    }, [isVisible, refreshTrigger]);
 
     useEffect(() => {
         if (window.lucide) {

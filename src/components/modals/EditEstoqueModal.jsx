@@ -8,6 +8,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
     const [unidade, setUnidade] = useState('Unidade');
     const [estado, setEstado] = useState('Novo');
     const [destino, setDestino] = useState('Estoque Geral');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (item) {
@@ -29,20 +30,27 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
 
     if (!isOpen) return null;
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
         const qtdNum = parseFloat(quantidade);
-        onSave({
-            idMaterial: idMaterial ? parseInt(idMaterial, 10) : null,
-            modo,
-            grupoKey,
-            novaDesc: descricao ? descricao.trim() : '',
-            novaCat: categoria ? parseInt(categoria, 10) : null,
-            novaQtd: isNaN(qtdNum) || qtdNum < 0 ? 0 : Math.round(qtdNum * 100) / 100,
-            novaUnidade: unidade,
-            novoEstado: estado,
-            novoDestino: destino
-        });
+        setIsSubmitting(true);
+        try {
+            await onSave({
+                idMaterial: idMaterial ? parseInt(idMaterial, 10) : null,
+                modo,
+                grupoKey,
+                novaDesc: descricao ? descricao.trim() : '',
+                novaCat: categoria ? parseInt(categoria, 10) : null,
+                novaQtd: isNaN(qtdNum) || qtdNum < 0 ? 0 : Math.round(qtdNum * 100) / 100,
+                novaUnidade: unidade,
+                novoEstado: estado,
+                novoDestino: destino
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -103,6 +111,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                                 type="number"
                                 id="edit-stock-qtd"
                                 min="0"
+                                step="any"
                                 value={quantidade}
                                 onChange={(e) => setQuantidade(e.target.value)}
                                 required
@@ -169,9 +178,13 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20 transition cursor-pointer flex items-center gap-2"
+                            disabled={isSubmitting}
+                            className={`px-5 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl shadow-md transition flex items-center gap-2 ${
+                                isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-700 cursor-pointer shadow-rose-600/20'
+                            }`}
                         >
-                            <i data-lucide="check" className="w-4 h-4"></i> Salvar Alterações no Estoque
+                            <i data-lucide={isSubmitting ? "loader-2" : "check"} className={`w-4 h-4 ${isSubmitting ? "animate-spin" : ""}`}></i>
+                            <span>{isSubmitting ? 'Salvando...' : 'Salvar Alterações no Estoque'}</span>
                         </button>
                     </div>
                 </form>
