@@ -86,7 +86,7 @@ function MainAppView({ onLoadingStart, onLoadingEnd }) {
     const handleSaveEstoque = async (payload) => {
         if (onLoadingStart) onLoadingStart();
         try {
-            const novaQtd = parseFloat(payload.novaQtd);
+            const novaQtd = parseFloat(String(payload.novaQtd).replace(',', '.'));
             if (isNaN(novaQtd) || novaQtd < 0) {
                 throw new Error('Quantidade inválida para o item de estoque.');
             }

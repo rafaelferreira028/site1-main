@@ -96,7 +96,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, adminSubTab, doadoresList, doacoesList, loadingData, expandedDoadorId, paginaDoacoes]);
+    }, [isVisible, adminSubTab, doadoresList, doacoesList, loadingData, expandedDoadorId, paginaDoacoes, searchQuery]);
 
     useEffect(() => {
         setPaginaDoacoes(1);
@@ -342,7 +342,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
                                         doacoesDoDoador.forEach(d => {
                                             if (d.doacoes_financeiras && d.doacoes_financeiras.length > 0) {
                                                 d.doacoes_financeiras.forEach(f => {
-                                                    totFinDoador += parseFloat(f.valor || 0);
+                                                    totFinDoador = Math.round((totFinDoador + (parseFloat(f.valor) || 0)) * 100) / 100;
                                                 });
                                             }
                                             if (d.doacoes_materiais && d.doacoes_materiais.length > 0) {

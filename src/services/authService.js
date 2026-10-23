@@ -240,7 +240,7 @@ async function verificarSessaoSupabase() {
         return { session: sessao, user: sessao.user };
     } catch (e) {
         console.error("Payload corrompido de sessão local, limpando:", e);
-        try { localStorage.removeItem(STORAGE_SESSION_KEY); } catch (_) {}
+        try { localStorage.removeItem(STORAGE_SESSION_KEY); } catch (errStorage) { console.warn('Erro ao limpar sessão local:', errStorage); }
     }
 
     return { session: null, user: null };

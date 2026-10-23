@@ -194,7 +194,7 @@
         }
 
         function mascararTelefone(val) {
-            if (!val) return "";
+            if (val === null || val === undefined || val === '') return "";
             const tel = formatarTelefone(val);
             return tel.replace(/^(\(\d{2}\)\s*\d)(\d{3,4})(-\d{4})$/, (match, p1, p2, p3) => {
                 return `${p1}${'*'.repeat(p2.length)}${p3}`;
@@ -211,29 +211,258 @@
         // ==========================================
         // 2. SERVIÇOS BANCO DE DADOS E RELATÓRIOS
         // ==========================================
-        const authService = {
-            verificarSessaoSupabase: async () => {
-                if (!supabaseClient) return { session: null };
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                return { session };
-            },
-            realizarLoginSupabase: async (email, password) => {
-                if (!supabaseClient) throw new Error("Supabase não configurado");
-                return await supabaseClient.auth.signInWithPassword({ email, password });
-            },
-            criarLoginSupabase: async (nome, email, password) => {
-                if (!supabaseClient) throw new Error("Supabase nao configurado");
-                return await supabaseClient.auth.signUp({
-                    email,
-                    password,
-                    options: { data: { name: nome || email } }
-                });
-            },
-            realizarLogoutSupabase: async () => {
-                if (!supabaseClient) return;
-                return await supabaseClient.auth.signOut();
+        const STORAGE_USERS_KEY = 'rede_usuarios_sistema';
+        const STORAGE_SESSION_KEY = 'rede_sessao_ativa';
+        const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 horas
+
+        async function hashSenha(senha, salt = null) {
+            if (!salt) {
+                const saltBytes = new Uint8Array(16);
+                if (window.crypto && window.crypto.getRandomValues) {
+                    window.crypto.getRandomValues(saltBytes);
+                } else {
+                    for (let i = 0; i < 16; i++) saltBytes[i] = Math.floor(Math.random() * 256);
+                }
+                salt = Array.from(saltBytes).map(b => b.toString(16).padStart(2, '0')).join('');
             }
+            const enc = new TextEncoder();
+            const data = enc.encode(salt + ":" + senha);
+            const hashBuf = await window.crypto.subtle.digest('SHA-256', data);
+            const hashArr = Array.from(new Uint8Array(hashBuf));
+            const hashHex = hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+            return `${salt}:${hashHex}`;
+        }
+
+        async function verificarSenha(senhaDigitada, hashArmazenado) {
+            if (!senhaDigitada || !hashArmazenado) return false;
+            if (!hashArmazenado.includes(':')) {
+                return hashArmazenado === senhaDigitada;
+            }
+            const [salt, hashOriginal] = hashArmazenado.split(':');
+            const hashGeradoCompleto = await hashSenha(senhaDigitada, salt);
+            const [, hashGerado] = hashGeradoCompleto.split(':');
+            return hashOriginal === hashGerado;
+        }
+
+        function getUsuariosLocais() {
+            try {
+                const raw = localStorage.getItem(STORAGE_USERS_KEY);
+                if (raw) {
+                    const list = JSON.parse(raw);
+                    if (Array.isArray(list) && list.length > 0) return list;
+                }
+            } catch (e) {
+                console.error("Erro ao ler usuários locais:", e);
+            }
+            const padrao = [{
+                id: 'usr_admin',
+                identificador: 'admin',
+                nome: 'Administrador',
+                tipo: 'id',
+                senha: 'a8f5c9e2b1d40376:bfdfdefeddb11aa609173c6a3407dba48bd77ba97c6482db5ab859551bc5c790',
+                criadoEm: new Date().toISOString()
+            }];
+            try {
+                localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(padrao));
+            } catch (e) {
+                console.warn("[Auth] Não foi possível persistir usuário inicial no storage:", e);
+            }
+            return padrao;
+        }
+
+        function salvarUsuariosLocais(usuarios) {
+            try {
+                localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(usuarios));
+            } catch (e) {
+                console.error("Erro ao salvar usuários locais:", e);
+            }
+        }
+
+        async function cadastrarNovoUsuario({ identificador, senha, nome, tipo }) {
+            if (!identificador || !identificador.trim()) {
+                throw new Error("Por favor, preencha o E-mail ou ID de Acesso desejado.");
+            }
+            if (!senha || senha.length < 8) {
+                throw new Error("A senha deve conter no mínimo 8 caracteres.");
+            }
+            const temLetra = /[a-zA-Z]/.test(senha);
+            const temNumero = /\d/.test(senha);
+            if (!temLetra || !temNumero) {
+                throw new Error("A senha deve conter letras e números para maior segurança.");
+            }
+
+            const idLimpo = identificador.trim();
+            const isEmail = idLimpo.includes('@');
+            const tipoFinal = tipo || (isEmail ? 'email' : 'id');
+
+            if (tipoFinal === 'email' && !idLimpo.includes('.')) {
+                throw new Error("Por favor, digite um endereço de e-mail válido.");
+            }
+
+            const usuarios = getUsuariosLocais();
+            const jaExiste = usuarios.some(u => u.identificador.toLowerCase() === idLimpo.toLowerCase());
+            if (jaExiste) {
+                throw new Error(`O ${tipoFinal === 'email' ? 'e-mail' : 'ID'} "${idLimpo}" já está cadastrado. Escolha outro ou faça login.`);
+            }
+
+            const senhaHash = await hashSenha(senha);
+            const novoId = (window.crypto && window.crypto.randomUUID)
+                ? 'usr_' + window.crypto.randomUUID()
+                : 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
+            const novo = {
+                id: novoId,
+                identificador: idLimpo,
+                nome: (nome && nome.trim()) ? nome.trim() : idLimpo,
+                tipo: tipoFinal,
+                senha: senhaHash,
+                criadoEm: new Date().toISOString()
+            };
+
+            usuarios.push(novo);
+            salvarUsuariosLocais(usuarios);
+
+            if (isEmail && supabaseClient) {
+                try {
+                    await supabaseClient.auth.signUp({
+                        email: idLimpo,
+                        password: senha,
+                        options: { data: { name: novo.nome } }
+                    });
+                } catch (e) {
+                    console.warn("Aviso ao registrar usuário no Supabase Auth:", e);
+                }
+            }
+
+            const { senha: _, ...usuarioSemSenha } = novo;
+            return { success: true, usuario: usuarioSemSenha };
+        }
+
+        async function realizarLoginFlexivel(identificadorOuEmail, password) {
+            const termo = (identificadorOuEmail || '').trim();
+            if (!termo) throw new Error("Informe o E-mail ou ID de Acesso.");
+            if (!password) throw new Error("Informe a senha de acesso.");
+
+            const usuarios = getUsuariosLocais();
+            const usuarioLocal = usuarios.find(u => u.identificador.toLowerCase() === termo.toLowerCase());
+
+            if (usuarioLocal) {
+                const senhaCorreta = await verificarSenha(password, usuarioLocal.senha);
+                if (senhaCorreta) {
+                    if (!usuarioLocal.senha.includes(':')) {
+                        usuarioLocal.senha = await hashSenha(password);
+                        salvarUsuariosLocais(usuarios);
+                    }
+
+                    const agora = Date.now();
+                    const sessaoLocal = {
+                        user: {
+                            id: usuarioLocal.id,
+                            email: usuarioLocal.tipo === 'email' ? usuarioLocal.identificador : `${usuarioLocal.identificador}@local.auth`,
+                            identificador: usuarioLocal.identificador,
+                            user_metadata: { name: usuarioLocal.nome, tipo: usuarioLocal.tipo }
+                        },
+                        tipo: 'local',
+                        criadoEm: agora,
+                        expiresAt: agora + SESSION_TTL_MS
+                    };
+                    try {
+                        localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessaoLocal));
+                    } catch (e) {
+                        console.error("[Auth] Falha ao persistir sessão local:", e);
+                        if (e.name === 'QuotaExceededError') {
+                            throw new Error("Armazenamento do navegador cheio. Limpe o histórico do navegador para fazer login.");
+                        }
+                    }
+                    return { data: { session: sessaoLocal, user: sessaoLocal.user }, error: null };
+                } else {
+                    throw new Error("Senha incorreta. Verifique e tente novamente.");
+                }
+            }
+
+            if (supabaseClient) {
+                const emailSupabase = termo.includes('@') ? termo : `${termo.toLowerCase()}@rede.org.br`;
+                try {
+                    const res = await supabaseClient.auth.signInWithPassword({
+                        email: emailSupabase,
+                        password: password
+                    });
+                    if (res.data && res.data.session) {
+                        return res;
+                    }
+                    if (res.error && termo.includes('@')) {
+                        throw res.error;
+                    }
+                } catch (err) {
+                    if (termo.includes('@')) {
+                        throw err;
+                    }
+                }
+            }
+
+            throw new Error(`O login "${termo}" não foi encontrado. Crie seu acesso na opção "Criar Novo Login".`);
+        }
+
+        async function verificarSessaoSupabase() {
+            if (supabaseClient && supabaseClient.auth) {
+                try {
+                    const { data: { session }, error } = await supabaseClient.auth.getSession();
+                    if (!error && session && session.user) {
+                        return { session, user: session.user };
+                    }
+                } catch (e) {
+                    console.warn("Aviso ao conectar com Supabase Auth:", e);
+                }
+            }
+
+            try {
+                const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+                if (!raw) return { session: null, user: null };
+
+                const sessao = JSON.parse(raw);
+                const isSessaoValida = sessao &&
+                    typeof sessao === 'object' &&
+                    sessao.user &&
+                    typeof sessao.user === 'object' &&
+                    typeof sessao.expiresAt === 'number';
+
+                if (!isSessaoValida || Date.now() > sessao.expiresAt) {
+                    localStorage.removeItem(STORAGE_SESSION_KEY);
+                    return { session: null, user: null };
+                }
+
+                return { session: sessao, user: sessao.user };
+            } catch (e) {
+                console.error("Payload corrompido de sessão local, limpando:", e);
+                try { localStorage.removeItem(STORAGE_SESSION_KEY); } catch (errStorage) { console.warn('Erro ao limpar sessão:', errStorage); }
+            }
+
+            return { session: null, user: null };
+        }
+
+        async function realizarLogoutSupabase() {
+            try {
+                localStorage.removeItem(STORAGE_SESSION_KEY);
+            } catch (e) {
+                console.error("Erro ao remover chave de sessão local:", e);
+            }
+            if (supabaseClient && supabaseClient.auth) {
+                try {
+                    await supabaseClient.auth.signOut();
+                } catch (e) {
+                    console.warn("Aviso ao efetuar signOut no Supabase:", e);
+                }
+            }
+            return { success: true };
+        }
+
+        const authService = {
+            verificarSessaoSupabase,
+            realizarLoginSupabase: realizarLoginFlexivel,
+            realizarLogoutSupabase,
+            cadastrarNovoUsuario
         };
+        window.authService = authService;
 
         async function exigirAutenticacao() {
             if (authService && authService.verificarSessaoSupabase) {
@@ -559,10 +788,10 @@
                     return isNaN(n) ? 0 : Math.round(n * 100) / 100;
                 };
 
-                const totalItens = materiais.reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
-                const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar') || m.destino_item?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
-                const totalAlimentos = materiais.filter(m => m.id_categoria === 2 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('alimento')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
-                const totalHigiene = materiais.filter(m => m.id_categoria === 3 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('higiene')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0);
+                const totalItens = Math.round(materiais.reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0) * 100) / 100;
+                const totalBazar = Math.round(materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar') || m.destino_item?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0) * 100) / 100;
+                const totalAlimentos = Math.round(materiais.filter(m => m.id_categoria === 2 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('alimento')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0) * 100) / 100;
+                const totalHigiene = Math.round(materiais.filter(m => m.id_categoria === 3 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('higiene')).reduce((acc, m) => acc + parseQtdPdf(m.quantidade), 0) * 100) / 100;
 
                 doc.setFillColor(248, 250, 252);
                 doc.setDrawColor(226, 232, 240);
@@ -672,6 +901,9 @@
                     }
                 });
 
+                totalFin = Math.round(totalFin * 100) / 100;
+                totalMatQtd = Math.round(totalMatQtd * 100) / 100;
+
                 doc.setFillColor(248, 250, 252);
                 doc.setDrawColor(226, 232, 240);
                 doc.roundedRect(14, 28, 269, 14, 2, 2, 'FD');
@@ -726,6 +958,11 @@
             }
         };
 
+        window.doadoresService = doadoresService;
+        window.doacoesService = doacoesService;
+        window.estoqueService = estoqueService;
+        window.pdfService = pdfService;
+
         // ==========================================
         // 3. REACT CONTEXT PROVIDERS
         // ==========================================
@@ -759,7 +996,12 @@
                         const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, newSession) => {
                             if (!isMounted) return;
                             if (event === 'SIGNED_OUT') {
-                                try { localStorage.removeItem('site1_auth_session'); } catch (_) {}
+                                try {
+                                    localStorage.removeItem('rede_sessao_ativa');
+                                    localStorage.removeItem('site1_auth_session');
+                                } catch (errStorage) {
+                                    console.warn('Erro ao limpar sessão:', errStorage);
+                                }
                                 setAuthenticated(false);
                                 setSession(null);
                             } else if (newSession) {
@@ -779,10 +1021,10 @@
                 };
             }, []);
 
-            const login = async (email, password) => {
+            const login = async (identifier, password) => {
                 if (onLoadingStart) onLoadingStart();
                 try {
-                    const { data, error } = await authService.realizarLoginSupabase(email, password);
+                    const { data, error } = await authService.realizarLoginSupabase(identifier, password);
                     if (error) throw error;
                     setAuthenticated(true);
                     setSession(data ? data.session : null);
@@ -810,25 +1052,18 @@
             const register = async (arg1, arg2, arg3) => {
                 if (onLoadingStart) onLoadingStart();
                 try {
-                    let nome, email, password;
+                    let payload;
                     if (typeof arg1 === 'object' && arg1 !== null) {
-                        nome = arg1.nome;
-                        email = arg1.identificador;
-                        password = arg1.senha;
+                        payload = arg1;
                     } else {
-                        nome = arg1;
-                        email = arg2;
-                        password = arg3;
+                        payload = { nome: arg1, identificador: arg2, senha: arg3, tipo: 'email' };
                     }
 
-                    const { data, error } = await authService.criarLoginSupabase(nome, email, password);
-                    if (error) throw error;
-                    if (data && data.session) {
-                        setAuthenticated(true);
-                        setSession(data.session);
-                        return { success: true, needsConfirmation: false };
-                    }
-                    return { success: true, needsConfirmation: true };
+                    const res = await authService.cadastrarNovoUsuario(payload);
+                    if (!res || !res.success) throw new Error("Falha ao registrar usuário.");
+                    const loginRes = await login(payload.identificador, payload.senha);
+                    if (!loginRes.success) throw loginRes.error;
+                    return { success: true, usuario: res.usuario };
                 } catch (error) {
                     return { success: false, error };
                 } finally {
@@ -1124,6 +1359,8 @@
 
             if (!isOpen) return null;
 
+            const cepSeqRef = useRef(0);
+
             const handleCepChange = async (e) => {
                 const valor = e.target.value;
                 const formatado = formatarCEP(valor);
@@ -1131,16 +1368,23 @@
 
                 const cepDigitos = String(valor).replace(/\D/g, '');
                 if (cepDigitos.length === 8) {
+                    const currentSeq = ++cepSeqRef.current;
                     setIsBuscaCepLoading(true);
-                    const res = await consultarCEP(cepDigitos);
-                    setIsBuscaCepLoading(false);
-                    if (res) {
-                        if (res.error) {
-                            mostrarToast(res.error, 'warning');
-                        } else {
-                            if (res.cidadeUf) setCidade(res.cidadeUf);
-                            if (res.endereco) setEndereco(res.endereco);
-                            mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+                    try {
+                        const res = await consultarCEP(cepDigitos);
+                        if (currentSeq !== cepSeqRef.current) return;
+                        if (res) {
+                            if (res.error) {
+                                mostrarToast(res.error, 'warning');
+                            } else {
+                                if (res.cidadeUf) setCidade(res.cidadeUf);
+                                if (res.endereco) setEndereco(res.endereco);
+                                mostrarToast('Endereço e cidade localizados com sucesso!', 'success');
+                            }
+                        }
+                    } finally {
+                        if (currentSeq === cepSeqRef.current) {
+                            setIsBuscaCepLoading(false);
                         }
                     }
                 }
@@ -1369,6 +1613,10 @@
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd *</label><input type="number" min="0.01" step="any" value={matQtd} onChange={(e) => setMatQtd(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
+                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade de Medida *</label><select value={matUnidade} onChange={(e) => setMatUnidade(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Pacote">Pacote (pct)</option><option value="Caixa">Caixa (cx)</option><option value="Litro">Litro (l)</option></select></div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Estado de Conservação *</label><select value={matEstado} onChange={(e) => setMatEstado(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Novo">Novo (Lacre de fábrica)</option><option value="Seminovo">Seminovo (Ótimo estado)</option><option value="Usado">Usado (Bom estado)</option><option value="Não se aplica">Não se aplica (Alimentos / Descartáveis)</option></select></div>
                                         <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={matDestino} onChange={(e) => setMatDestino(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
                                     </div>
                                 </div>
@@ -1408,6 +1656,8 @@
                 }
             }, [item, modo, categorias]);
 
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isOpen]);
+
             if (!isOpen) return null;
 
             const handleSubmit = async (e) => {
@@ -1418,8 +1668,15 @@
                 setIsSubmitting(true);
                 try {
                     await onSave({
-                        idMaterial: parseInt(idMaterial, 10), modo, grupoKey, novaDesc: descricao, novaCat: parseInt(categoria, 10),
-                        novaQtd: isNaN(qtdNum) || qtdNum < 0 ? 0 : Math.round(qtdNum * 100) / 100, novaUnidade: unidade, novoEstado: estado, novoDestino: destino
+                        idMaterial: idMaterial ? parseInt(idMaterial, 10) : null,
+                        modo,
+                        grupoKey,
+                        novaDesc: descricao ? descricao.trim() : '',
+                        novaCat: categoria ? parseInt(categoria, 10) : null,
+                        novaQtd: isNaN(qtdNum) || qtdNum < 0 ? 0 : Math.round(qtdNum * 100) / 100,
+                        novaUnidade: unidade,
+                        novoEstado: estado,
+                        novoDestino: destino
                     });
                 } finally {
                     setIsSubmitting(false);
@@ -1453,8 +1710,33 @@
                                 <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Qtd Total *</label><input type="number" min="0" step="any" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono" /></div>
                             </div>
                             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${modo === 'consolidado' ? 'hidden' : ''}`}>
-                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade *</label><select value={unidade} onChange={(e) => setUnidade(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Pacote">Pacote (pct)</option></select></div>
-                                <div><label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label><select value={destino} onChange={(e) => setDestino(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm"><option value="Estoque Geral">Estoque Geral</option><option value="Bazar">Bazar</option><option value="Uso Direto Paciente">Uso Direto Paciente</option></select></div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unidade *</label>
+                                    <select value={unidade} onChange={(e) => setUnidade(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">
+                                        <option value="Unidade">Unidade (un)</option>
+                                        <option value="Kg">Quilograma (kg)</option>
+                                        <option value="Pacote">Pacote (pct)</option>
+                                        <option value="Caixa">Caixa (cx)</option>
+                                        <option value="Litro">Litro (l)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Estado de Conservação *</label>
+                                    <select value={estado} onChange={(e) => setEstado(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">
+                                        <option value="Novo">Novo (Lacre de fábrica)</option>
+                                        <option value="Seminovo">Seminovo (Ótimo estado)</option>
+                                        <option value="Usado">Usado (Bom estado)</option>
+                                        <option value="Não se aplica">Não se aplica (Alimentos / Descartáveis)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className={modo === 'consolidado' ? 'hidden' : ''}>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Destino *</label>
+                                <select value={destino} onChange={(e) => setDestino(e.target.value)} disabled={modo === 'consolidado'} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm">
+                                    <option value="Estoque Geral">Estoque Geral</option>
+                                    <option value="Bazar">Bazar</option>
+                                    <option value="Uso Direto Paciente">Uso Direto Paciente</option>
+                                </select>
                             </div>
                             <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                                 <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-gray-600">Cancelar</button>
@@ -1679,16 +1961,18 @@
                 if (onLoadingStart) onLoadingStart();
                 let idDoacaoGerado = null;
                 try {
-                    const { data: doacaoCriada, error: errorPai } = await doacoesService.criarEventoDoacao({ id_doador: parseInt(idDoador), canal_recebimento: canal, observacoes: observacoes || null });
+                    const { data: doacaoCriada, error: errorPai } = await doacoesService.criarEventoDoacao({ id_doador: parseInt(idDoador, 10), canal_recebimento: canal, observacoes: observacoes || null });
                     if (errorPai) throw errorPai;
                     if (!doacaoCriada || doacaoCriada.length === 0) throw new Error('Não foi possível obter o identificador da doação criada.');
                     idDoacaoGerado = doacaoCriada[0].id_doacao;
                     if (checkFinanceiro) {
-                        const { error } = await doacoesService.criarDoacaoFinanceira({ id_doacao: idDoacaoGerado, valor: parseFloat(finValor), comprovante_transacao: finComprovante || null });
+                        const valFin = sanitizarValorMonetario(finValor);
+                        if (!valFin || valFin <= 0) { throw new Error('Informe um valor financeiro válido maior que zero.'); }
+                        const { error } = await doacoesService.criarDoacaoFinanceira({ id_doacao: idDoacaoGerado, valor: valFin, comprovante_transacao: finComprovante || null });
                         if (error) throw error;
                     }
                     if (checkMaterial) {
-                        const qtdLimpa = parseFloat(matQtd);
+                        const qtdLimpa = parseFloat(String(matQtd).replace(',', '.'));
                         if (isNaN(qtdLimpa) || qtdLimpa <= 0) { throw new Error('Informe uma quantidade de material válida maior que zero.'); }
                         const catId = parseInt(matCategoria, 10) || (categorias[0] ? categorias[0].id_categoria : 1);
                         const { error } = await doacoesService.criarDoacaoMaterial({ id_doacao: idDoacaoGerado, id_categoria: catId, descricao_item: matDescricao, quantidade: Math.round(qtdLimpa * 100) / 100, unidade_medida: matUnidade, estado_conservacao: matEstado, destino_item: matDestino });
@@ -1883,7 +2167,7 @@
             };
 
             useEffect(() => { if (isVisible) carregarDadosAdmin(); }, [isVisible, refreshTrigger]);
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, loadingData, expandedDoadorId, paginaDoacoes]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, adminSubTab, doadoresList, doacoesList, loadingData, expandedDoadorId, paginaDoacoes, searchQuery]);
             useEffect(() => { setPaginaDoacoes(1); }, [searchQuery, adminSubTab]);
             if (!isVisible) return null;
 
@@ -2016,7 +2300,7 @@
                                                 ));
                                                 let totFinDoador = 0; let matItemsDoador = [];
                                                 doacoesDoDoador.forEach(d => {
-                                                    if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => { totFinDoador += parseFloat(f.valor || 0); });
+                                                    if (d.doacoes_financeiras) d.doacoes_financeiras.forEach(f => { totFinDoador = Math.round((totFinDoador + (parseFloat(f.valor) || 0)) * 100) / 100; });
                                                     if (d.doacoes_materiais) d.doacoes_materiais.forEach(m => { matItemsDoador.push(m); });
                                                 });
                                                 const isExpanded = expandedDoadorId === doador.id_doador;
@@ -2224,7 +2508,7 @@
             };
 
             useEffect(() => { if (isVisible) carregarEstoque(); }, [isVisible, refreshTrigger]);
-            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueSubTab, modoVisao, estoqueList]);
+            useEffect(() => { if (window.lucide) lucide.createIcons(); }, [isVisible, estoqueSubTab, modoVisao, estoqueList, estoqueDoacoesList, searchQuery]);
             if (!isVisible) return null;
 
             const handlePDF = async () => {
@@ -2518,13 +2802,18 @@
             const handleSaveEstoque = async (payload) => {
                 if (onLoadingStart) onLoadingStart();
                 try {
+                    const novaQtd = parseFloat(String(payload.novaQtd).replace(',', '.'));
+                    if (isNaN(novaQtd) || novaQtd < 0) {
+                        throw new Error('Quantidade inválida para o item de estoque.');
+                    }
                     const novosDados = { descricao_item: payload.novaDesc, id_categoria: payload.novaCat, unidade_medida: payload.novaUnidade, estado_conservacao: payload.novoEstado, destino_item: payload.novoDestino };
                     if (payload.modo === 'consolidado') {
                         if (!selectedEstoqueItem || !selectedEstoqueItem.lotes) throw new Error('Dados dos lotes não encontrados.');
-                        const diferenca = payload.novaQtd - selectedEstoqueItem.quantidadeTotal;
+                        const qtdTotalAtual = parseFloat(selectedEstoqueItem.quantidadeTotal) || 0;
+                        const diferenca = Math.round((novaQtd - qtdTotalAtual) * 100) / 100;
                         await estoqueService.atualizarEstoqueConsolidado(selectedEstoqueItem.lotes, diferenca, novosDados);
                     } else {
-                        await estoqueService.atualizarItemEstoqueLote(payload.idMaterial, { ...novosDados, quantidade: payload.novaQtd });
+                        await estoqueService.atualizarItemEstoqueLote(payload.idMaterial, { ...novosDados, quantidade: novaQtd });
                     }
                     mostrarToast('Estoque atualizado com sucesso!', 'success');
                     setEditEstoqueModalOpen(false);

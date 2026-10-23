@@ -96,7 +96,7 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
             ? (window.sanitizarValorMonetario ? window.sanitizarValorMonetario(finValor) : (parseFloat(String(finValor).replace(',', '.')) || 0))
             : null;
         const qtdMatLimpa = checkMaterial
-            ? (parseFloat(matQtd) || 0)
+            ? (parseFloat(String(matQtd).replace(',', '.')) || 0)
             : 0;
 
         if (checkFinanceiro && (!valorFinLimpo || valorFinLimpo <= 0)) {

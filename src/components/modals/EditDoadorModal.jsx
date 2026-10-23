@@ -40,6 +40,8 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
 
     if (!isOpen) return null;
 
+    const cepSeqRef = React.useRef(0);
+
     const handleCepChange = async (e) => {
         const valor = e.target.value;
         const formatado = window.formatarCEP ? window.formatarCEP(valor) : valor;
@@ -47,11 +49,13 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
 
         const cepDigitos = valor.replace(/\D/g, '');
         if (cepDigitos.length === 8) {
+            const currentSeq = ++cepSeqRef.current;
             setIsBuscaCepLoading(true);
             try {
                 const fnConsulta = window.consultarCEP || (typeof consultarCEP !== 'undefined' ? consultarCEP : null);
                 if (fnConsulta) {
                     const res = await fnConsulta(cepDigitos);
+                    if (currentSeq !== cepSeqRef.current) return;
                     if (res) {
                         if (res.error) {
                             mostrarToast(res.error, 'warning');
@@ -66,7 +70,9 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
                 console.error("Erro na busca de CEP:", err);
                 mostrarToast('Não foi possível autocompletar o CEP.', 'warning');
             } finally {
-                setIsBuscaCepLoading(false);
+                if (currentSeq === cepSeqRef.current) {
+                    setIsBuscaCepLoading(false);
+                }
             }
         }
     };

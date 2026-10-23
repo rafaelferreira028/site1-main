@@ -52,10 +52,10 @@ async function exportarPDFEstoqueOficial() {
     };
 
     // 2. Resumo de Métricas (Cards no PDF)
-    const totalItens = materiais.reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
-    const totalBazar = materiais.filter(m => m.id_categoria === 6 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('bazar') || m.destino_item?.toLowerCase().includes('bazar')).reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
-    const totalAlimentos = materiais.filter(m => m.id_categoria === 2 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('alimento')).reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
-    const totalHigiene = materiais.filter(m => m.id_categoria === 3 || m.categorias_itens?.nome_categoria?.toLowerCase().includes('higiene')).reduce((acc, m) => acc + parseQtd(m.quantidade), 0);
+    const totalItens = Math.round(materiais.reduce((acc, m) => acc + parseQtd(m.quantidade), 0) * 100) / 100;
+    const totalBazar = Math.round(materiais.filter(m => m.id_categoria === 6 || (m.categorias_itens && m.categorias_itens.nome_categoria && m.categorias_itens.nome_categoria.toLowerCase().includes('bazar')) || (m.destino_item && m.destino_item.toLowerCase().includes('bazar'))).reduce((acc, m) => acc + parseQtd(m.quantidade), 0) * 100) / 100;
+    const totalAlimentos = Math.round(materiais.filter(m => m.id_categoria === 2 || (m.categorias_itens && m.categorias_itens.nome_categoria && m.categorias_itens.nome_categoria.toLowerCase().includes('alimento'))).reduce((acc, m) => acc + parseQtd(m.quantidade), 0) * 100) / 100;
+    const totalHigiene = Math.round(materiais.filter(m => m.id_categoria === 3 || (m.categorias_itens && m.categorias_itens.nome_categoria && m.categorias_itens.nome_categoria.toLowerCase().includes('higiene'))).reduce((acc, m) => acc + parseQtd(m.quantidade), 0) * 100) / 100;
 
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
@@ -74,7 +74,7 @@ async function exportarPDFEstoqueOficial() {
     materiais.forEach(item => {
         const categoria = item.destino_item === 'Bazar' || item.id_categoria === 6
             ? 'Bazar'
-            : (item.categorias_itens?.nome_categoria || 'Sem categoria');
+            : ((item.categorias_itens && item.categorias_itens.nome_categoria) || 'Sem categoria');
         const key = `categoria-${item.id_categoria || categoria.toLowerCase()}`;
         if (!grupos[key]) {
             grupos[key] = {
@@ -205,6 +205,9 @@ async function exportarPDFDoacoesOficial() {
             d.doacoes_materiais.forEach(m => { totalMatQtd += parseQtdMat(m.quantidade); });
         }
     });
+
+    totalFin = Math.round(totalFin * 100) / 100;
+    totalMatQtd = Math.round(totalMatQtd * 100) / 100;
 
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);

@@ -31,7 +31,12 @@ function AuthProvider({ children, onLoadingStart, onLoadingEnd }) {
                 const { data: { subscription } } = window.supabaseClient.auth.onAuthStateChange((event, newSession) => {
                     if (!isMounted) return;
                     if (event === 'SIGNED_OUT') {
-                        try { localStorage.removeItem('site1_auth_session'); } catch (_) {}
+                        try {
+                            localStorage.removeItem('rede_sessao_ativa');
+                            localStorage.removeItem('site1_auth_session');
+                        } catch (errStorage) {
+                            console.warn('Erro ao limpar sessão:', errStorage);
+                        }
                         setAuthenticated(false);
                         setSession(null);
                         setCurrentUser(null);

@@ -64,7 +64,7 @@ function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEs
         if (window.lucide) {
             lucide.createIcons();
         }
-    }, [isVisible, estoqueSubTab, modoVisao, estoqueList, estoqueDoacoesList, loadingData]);
+    }, [isVisible, estoqueSubTab, modoVisao, estoqueList, estoqueDoacoesList, loadingData, searchQuery]);
 
     if (!isVisible) return null;
 

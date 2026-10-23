@@ -34,7 +34,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
         e.preventDefault();
         if (isSubmitting) return;
 
-        const qtdNum = parseFloat(quantidade);
+        const qtdNum = parseFloat(String(quantidade).replace(',', '.'));
         setIsSubmitting(true);
         try {
             await onSave({

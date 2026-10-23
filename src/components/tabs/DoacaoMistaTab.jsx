@@ -157,7 +157,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
             }
 
             if (checkMaterial) {
-                const qtdLimpa = parseFloat(matQtd);
+                const qtdLimpa = parseFloat(String(matQtd).replace(',', '.'));
                 if (isNaN(qtdLimpa) || qtdLimpa <= 0) {
                     throw new Error('Informe uma quantidade de material válida maior que zero.');
                 }
