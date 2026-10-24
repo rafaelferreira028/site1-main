@@ -18,6 +18,7 @@ async function buscarDoadores() {
 
 async function buscarDoadoresTodos() {
     if (!window.supabaseClient) return { data: [], error: null };
+    await exigirAutenticacao();
     return await window.supabaseClient.from('doadores').select('*').order('nome');
 }
 

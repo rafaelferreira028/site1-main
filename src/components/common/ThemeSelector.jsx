@@ -23,7 +23,7 @@ function ThemeSelector() {
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [theme, menuOpen]);
 

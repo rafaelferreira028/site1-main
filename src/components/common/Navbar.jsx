@@ -3,7 +3,7 @@ const { useEffect } = React;
 function Navbar({ activeTab, onSwitchTab }) {
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [activeTab]);
 

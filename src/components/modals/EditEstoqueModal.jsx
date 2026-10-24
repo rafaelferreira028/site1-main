@@ -24,7 +24,7 @@ function EditEstoqueModal({ isOpen, item, modo, grupoKey, categorias, onClose, o
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [isOpen]);
 

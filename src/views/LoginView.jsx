@@ -27,12 +27,17 @@ function LoginView() {
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try {
+                lucide.createIcons();
+            } catch (_) {}
         }
     }, [mode, regType, errorMsg, successMsg, showLoginPassword, showRegPassword, isSubmitting]);
 
     const handleLoginSubmit = async (e) => {
-        e.preventDefault();
+        if (e) {
+            e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
         setErrorMsg('');
         setSuccessMsg('');
         setIsSubmitting(true);
@@ -51,7 +56,10 @@ function LoginView() {
     };
 
     const handleRegisterSubmit = async (e) => {
-        e.preventDefault();
+        if (e) {
+            e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
         setErrorMsg('');
         setSuccessMsg('');
 
@@ -167,6 +175,7 @@ function LoginView() {
                                 id="global-email-input"
                                 value={loginIdentifier}
                                 onChange={(e) => setLoginIdentifier(e.target.value)}
+                                autoComplete="username"
                                 placeholder="Digite seu E-mail ou ID"
                                 required
                                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm focus:border-rose-500 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white"
@@ -184,6 +193,7 @@ function LoginView() {
                                     id="global-password-input"
                                     value={loginPassword}
                                     onChange={(e) => setLoginPassword(e.target.value)}
+                                    autoComplete="current-password"
                                     placeholder="Senha de Acesso"
                                     required
                                     className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 dark:border-slate-700 text-sm focus:border-rose-500 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white"
@@ -281,6 +291,7 @@ function LoginView() {
                                 type="text"
                                 value={regNome}
                                 onChange={(e) => setRegNome(e.target.value)}
+                                autoComplete="name"
                                 placeholder="Ex: Rafael Ferreira ou Operador"
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm focus:border-rose-500 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white"
                             />
@@ -298,6 +309,7 @@ function LoginView() {
                                 type={regType === 'email' ? 'email' : 'text'}
                                 value={regIdentifier}
                                 onChange={(e) => setRegIdentifier(e.target.value)}
+                                autoComplete="username"
                                 placeholder={regType === 'email' ? 'Digite seu e-mail' : 'Digite o ID que você quiser'}
                                 required
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm focus:border-rose-500 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white"
@@ -314,6 +326,7 @@ function LoginView() {
                                     type={showRegPassword ? "text" : "password"}
                                     value={regPassword}
                                     onChange={(e) => setRegPassword(e.target.value)}
+                                    autoComplete="new-password"
                                     placeholder="Mínimo 8 caracteres (letras e números)"
                                     required
                                     minLength="8"
@@ -342,6 +355,7 @@ function LoginView() {
                                 type={showRegPassword ? "text" : "password"}
                                 value={regConfirmPassword}
                                 onChange={(e) => setRegConfirmPassword(e.target.value)}
+                                autoComplete="new-password"
                                 placeholder="Digite a mesma senha novamente"
                                 required
                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm focus:border-rose-500 bg-white dark:bg-[#070c14] text-slate-800 dark:text-white"

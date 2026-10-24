@@ -33,6 +33,7 @@ async function criarDoacaoMaterial(dadosMat) {
 
 async function buscarDoacoesAdmin() {
     if (!window.supabaseClient) return { data: [], error: null };
+    await exigirAutenticacao();
     const { data, error } = await window.supabaseClient
         .from('doacoes')
         .select('*, doadores(nome), doacoes_financeiras(*), doacoes_materiais(*)')

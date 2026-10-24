@@ -66,7 +66,7 @@ function EditDoacaoModal({ isOpen, doacao, doadores, categorias, onClose, onSave
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [isOpen, checkFinanceiro, checkMaterial, dropdownOpen]);
 

@@ -46,7 +46,7 @@ function DoacaoMistaTab({ isVisible, doadores, categorias, onDoacaoRegistrada, o
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [isVisible, checkFinanceiro, checkMaterial, dropdownOpen, isSubmitting]);
 

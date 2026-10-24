@@ -59,8 +59,8 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
     if (!Array.isArray(lotes) || lotes.length === 0) throw new Error("Nenhum lote válido fornecido para atualização.");
     await exigirAutenticacao();
 
-    const diferencaNum = Number(diferenca) || 0;
-    const somaAtual = lotes.reduce((acc, l) => acc + (parseFloat(l.quantidade) || 0), 0);
+    const diferencaNum = Number(String(diferenca).replace(',', '.')) || 0;
+    const somaAtual = lotes.reduce((acc, l) => acc + (parseFloat(String(l.quantidade).replace(',', '.')) || 0), 0);
 
     if (somaAtual + diferencaNum < 0) {
         throw new Error(`Operação inválida: a redução (${Math.abs(diferencaNum)}) é maior que o saldo em estoque (${somaAtual}).`);
@@ -71,7 +71,7 @@ async function atualizarEstoqueConsolidado(lotes, diferenca, novosDados) {
 
     try {
         for (const lote of lotes) {
-            const quantidadeAtual = parseFloat(lote.quantidade) || 0;
+            const quantidadeAtual = parseFloat(String(lote.quantidade).replace(',', '.')) || 0;
             let qtdLote = quantidadeAtual;
 
             if (diferencaRestante > 0) {

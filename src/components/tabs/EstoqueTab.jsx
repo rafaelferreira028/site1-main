@@ -62,7 +62,7 @@ function EstoqueTab({ isVisible, refreshTrigger, onOpenEditEstoque, onOpenEditEs
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [isVisible, estoqueSubTab, modoVisao, estoqueList, estoqueDoacoesList, loadingData, searchQuery]);
 

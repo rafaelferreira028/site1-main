@@ -17,7 +17,7 @@ function DoadorTab({ isVisible, onDoadorCadastrado, onLoadingStart, onLoadingEnd
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [isVisible, tipoDoador, isBuscaCepLoading, isSubmitting]);
 

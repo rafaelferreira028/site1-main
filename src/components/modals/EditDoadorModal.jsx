@@ -34,7 +34,7 @@ function EditDoadorModal({ isOpen, doador, onClose, onSave }) {
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [isOpen, tipoDoador, isBuscaCepLoading]);
 

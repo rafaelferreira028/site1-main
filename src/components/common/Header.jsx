@@ -6,7 +6,7 @@ function Header() {
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [currentUser]);
 

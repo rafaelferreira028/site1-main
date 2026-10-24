@@ -94,7 +94,7 @@ function AdminTab({ isVisible, refreshTrigger, onOpenEditDoador, onOpenEditDoaca
 
     useEffect(() => {
         if (window.lucide) {
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
         }
     }, [isVisible, adminSubTab, doadoresList, doacoesList, loadingData, expandedDoadorId, paginaDoacoes, searchQuery]);
 
